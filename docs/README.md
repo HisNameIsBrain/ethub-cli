@@ -1,47 +1,44 @@
 # ETHUB CLI
 
-ETHUB CLI is a versatile tool for managing training data, persistent memory, and code snippets. It's designed to be isolated and self-contained.
+ETHUB CLI is a versatile tool for managing training data, persistent memory, code snippets, and smart web searching with an integrated shell-like environment.
 
-## Installation
+## Features
 
-Ensure you have Python 3.x installed. You can run the CLI directly:
-
+### 1. Interactive Shell Mode
+Start the CLI without arguments to enter the interactive mode:
 ```bash
-python3 ethub_cli.py [command]
+python3 ethub_cli.py
 ```
+This mode includes:
+- **ANSI Intro Animation**: Plays on startup.
+- **Forward-Only Navigation**: Use `cd` to move into subdirectories. The CLI prevents moving above the project root for security.
+- **Shell Commands**:
+    - `ls`: List files.
+    - `cd <dir>`: Change directory (forward only).
+    - `cp <src> <dst>`: Copy files.
+    - `mv <src> <dst>`: Move/Rename files.
+    - `co <file>`: View file content (alias for `cat`).
+    - `rm <file/dir>`: Remove files or directories.
+- **Command Approval Workflow**: Every shell command requires approval. You can **[a]pprove**, **[d]eny**, or **[e]dit** the command before execution.
 
-To make it easier, you can alias it:
+### 2. Smart Search & Auto-Data Capture
+Type any non-command request to trigger a Smart Search:
+- **Auto-Snippet Extraction**: Code blocks in your requests (or future AI responses) are automatically saved to `snippets.json`.
+- **Memory Tracking**: Every request is logged in `memory.json`.
+- **Training Integration**: Satisfactory results and snippets are saved to `training.json` with metadata.
+- **Debug Mode**: Automatically detects error traces and searches for safe solutions on Stack Overflow and GitHub.
 
-```bash
-alias ethub-cli='python3 /path/to/ethub_cli.py'
-```
+### 3. Integrated Audit System
+File changes can be audited using a unified diff view before being applied (integrated into the workflow).
 
-## Getting Started
+## Available CLI Commands
+These can be used directly from the terminal or inside the interactive shell:
+- `init`: Initialize project structure.
+- `train`: Manage training data.
+- `memory`: Manage persistent memory.
+- `snippets`: Manage code snippets.
+- `rollback`: Revert the last data modification.
+- `search <engine> <query>`: Direct engine search.
 
-First, initialize the project structure:
-
-```bash
-python3 ethub_cli.py init
-```
-
-This creates the necessary `data/`, `training/`, and `docs/` directories.
-
-## Available Commands
-
-- **init**: Initialize the project structure and data files.
-- **train**: Manage training data.
-    - `add "<text>"`: Add a new training entry.
-    - `list`: List all training entries.
-    - `clear`: Clear all training data.
-- **memory**: Manage persistent memory.
-    - `save <key> <value>`: Save a key-value pair to memory.
-    - `get <key>`: Retrieve a value from memory.
-    - `list`: List all memory entries.
-    - `clear`: Clear all memory.
-- **snippets**: Manage code snippets.
-    - `add <name> "<code>"`: Add a new snippet.
-    - `get <name>`: Retrieve a snippet by name.
-    - `list`: List all snippet names.
-    - `clear`: Clear all snippets.
-
-Detailed documentation for each command can be found in the `docs/commands/` directory.
+## Documentation
+Detailed command documentation is available in `docs/commands/`.
