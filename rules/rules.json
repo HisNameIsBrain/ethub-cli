@@ -1,0 +1,16 @@
+{
+  "deny_patterns": [
+    "exec(",
+    "eval(",
+    "os.system",
+    "subprocess",
+    "rm -rf /"
+  ],
+  "allowed_engines": [
+    "google",
+    "github",
+    "wiki",
+    "substack",
+    "chatgpt"
+  ]
+}
