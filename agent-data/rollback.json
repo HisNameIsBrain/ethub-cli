@@ -1,0 +1,14 @@
+[
+    {
+        "timestamp": "2026-03-05T19:16:03.448818",
+        "query": "fix react hook bug",
+        "snapshot_id": "20260305_191603_441988",
+        "path": "agent-data/snapshots/20260305_191603_441988"
+    },
+    {
+        "timestamp": "2026-03-05T19:17:24.003041",
+        "query": " ethub-cli I want the animation to run longer",
+        "snapshot_id": "20260305_191723_999047",
+        "path": "agent-data/snapshots/20260305_191723_999047"
+    }
+]
