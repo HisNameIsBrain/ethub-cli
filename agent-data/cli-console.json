@@ -146,5 +146,13 @@
     {
         "timestamp": "2026-03-08 15:01:55",
         "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
+    },
+    {
+        "timestamp": "2026-03-08 15:15:54",
+        "text": "\u001b[36m[INFO]\u001b[0m ETHUB CLI Agent initialized. Model: qwen2.5:0.5b"
+    },
+    {
+        "timestamp": "2026-03-08 15:15:54",
+        "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
     }
 ]

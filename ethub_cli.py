@@ -41,7 +41,8 @@ You have access to the following tools:
 1. "web_search": Searches the internet. Requires argument "query".
 2. "fetch_url": Fetches text content from a specific URL. Requires argument "url".
 3. "ethub_action": Performs surgical directory actions (list, read, patch). Requires "sub" (list/read/patch) and "target" (file path). For "patch", also requires "content".
-4. "final_answer": Provides the final response to the user. Requires argument "text".
+4. "ethub_return": Performs system recovery actions (list/restore/rollback). Requires "sub" (list/restore/rollback). For "restore", requires "point_id". For "rollback", requires "target" (file name).
+5. "final_answer": Provides the final response to the user. Requires argument "text".
 
 ### 🏗️ Strategic Formatting Hierarchy
 When you process code, debugging information, or errors, you MUST use the following Semantic Labels:
@@ -143,6 +144,20 @@ def ethub_action(sub, target=None, content=None):
         return action_engine.apply_patch(target, content)
     else:
         return f"Unknown sub-action: {sub}. Use list, read, or patch."
+
+def ethub_return_action(sub, point_id=None, target=None):
+    """Executes a recovery action using the EthubReturnEngine."""
+    if sub == "list":
+        points = return_engine.list_return_points()
+        return f"[FIELD: RETURN_MANIFEST]\n" + "\n".join(points)
+    elif sub == "restore":
+        if not point_id: return "Error: 'point_id' required for restore."
+        return return_engine.restore_to(point_id)
+    elif sub == "rollback":
+        if not target: return "Error: 'target' file name required for surgical rollback."
+        return return_engine.rollback_surgical_fix(target)
+    else:
+        return f"Unknown recovery sub-action: {sub}. Use list, restore, or rollback."
 
 def chat_with_ollama(messages):
     ollama_url = config.get("ollama_url").replace("/api/pull", "/api/chat") # Auto-fix old typo if present
@@ -269,8 +284,18 @@ def run_agent_loop(messages, query=""):
                 helper.log_console(text)
                 result = ethub_action(sub, target, content)
                 messages.append({"role": "user", "content": f"Result of surgical {sub}:\n{result}"})
+            elif action == "ethub_return":
+                sub = args.get('sub', '')
+                point_id = args.get('point_id', '')
+                target = args.get('target', '')
+                helper.log_live("action", f"Recovery Action: {sub} {point_id or target}", {"sub": sub, "point_id": point_id, "target": target})
+                text = f"\x1b[31m[*] Executing recovery {sub}...\x1b[0m"
+                print(text)
+                helper.log_console(text)
+                result = ethub_return_action(sub, point_id, target)
+                messages.append({"role": "user", "content": f"Result of recovery {sub}:\n{result}"})
             else:
-                messages.append({"role": "user", "content": f"Unknown action: {action}. Please use web_search, fetch_url, ethub_action, or final_answer."})
+                messages.append({"role": "user", "content": f"Unknown action: {action}. Please use web_search, fetch_url, ethub_action, ethub_return, or final_answer."})
         except json.JSONDecodeError:
             helper.print_error("Agent did not return valid JSON. Retrying...")
             messages.append({"role": "user", "content": "Your previous response was not valid JSON. You MUST return ONLY a JSON object."})
@@ -296,6 +321,7 @@ def handle_command(cmd_input, messages):
             "/search q   - Perform a manual web search\n"
             "/sysinfo    - Show system information\n"
             "/train cmd  - Manage training data (add, list, clear, import)\n"
+            "/action cmd - Surgical Directory Actions (list, read <f>, patch <f> <c>)\n"
             "/return cmd - System Recovery (list, <point_id>)\n"
             "/web cmd    - Web Dashboard (start, stop)\n"
             "/ollama cmd - Help for Ollama"
@@ -303,6 +329,29 @@ def handle_command(cmd_input, messages):
         print(helper.format_box(help_text, title="ETHUB SURGICAL COMMANDS"))
     elif cmd == "/clear":
         helper.clear_screen()
+    elif cmd == "/action":
+        if len(parts) > 1:
+            sub = parts[1].lower()
+            if sub == "list":
+                print(action_engine.list_files())
+            elif sub == "read":
+                if len(parts) > 2:
+                    print(action_engine.read_target(parts[2]))
+                else:
+                    helper.print_error("Usage: /action read <file_name>")
+            elif sub == "patch":
+                if len(parts) > 3:
+                    file_name = parts[2]
+                    content = " ".join(parts[3:])
+                    # For terminal convenience, allow escaped newlines
+                    content = content.replace("\\n", "\n")
+                    print(action_engine.apply_patch(file_name, content))
+                else:
+                    helper.print_error("Usage: /action patch <file_name> <content>")
+            else:
+                helper.print_error(f"Unknown action sub-command: {sub}")
+        else:
+            helper.print_error("Usage: /action [list | read <f> | patch <f> <c>]")
     elif cmd == "/settings":
         settings = config.list_settings()
         print(helper.format_box(json.dumps(settings, indent=4), title="Settings"))

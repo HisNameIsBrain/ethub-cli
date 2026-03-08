@@ -10,5 +10,17 @@
         "category": "info",
         "message": "Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback.",
         "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 15:15:54",
+        "category": "info",
+        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 15:15:54",
+        "category": "info",
+        "message": "Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback.",
+        "details": {}
     }
 ]

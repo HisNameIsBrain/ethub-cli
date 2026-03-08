@@ -57,4 +57,10 @@ class HybridEngine:
         print("\x1b[90m[Hybris] Planning search strategy...\x1b[0m")
         actions = self.actor.decide_actions(reasoning)
         
+        # 4. Direct Answer Heuristic
+        if reasoning.get("query_type") == "general_query" and local_info:
+             print("\x1b[90m[Hybris] Simple question detected. Suggesting direct answer.\x1b[0m")
+             actions["action"] = "final_answer"
+             actions["direct_suggest"] = True
+        
         return reasoning, actions
