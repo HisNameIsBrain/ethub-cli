@@ -6,10 +6,33 @@ import urllib.error
 import argparse
 import sys
 import re
+import os
+import time
+import zipfile
+import io
+import readline
 from html.parser import HTMLParser
 
-OLLAMA_URL = "http://127.0.0.1:11434/api/pull"
-MODEL = "qwen2.5:0.5b"
+# Import core engines
+try:
+    from core.config_engine import ConfigEngine
+    from core.helper_engine import HelperEngine
+    from core.snapshot_engine import SnapshotEngine
+    from core.safety_engine import SafetyEngine
+    from core.hybrid_engine import HybridEngine
+    from ui.rainbow_animation import run_intro
+    from test_token_counter import TokenCounter
+except ImportError as e:
+    print(f"Error importing core components: {e}")
+    sys.exit(1)
+
+# Load configuration
+config = ConfigEngine()
+helper = HelperEngine()
+snapshot_engine = SnapshotEngine()
+safety_engine = SafetyEngine()
+hybrid_engine = HybridEngine()
+token_counter = TokenCounter()
 
 SYSTEM_PROMPT = """You are an autonomous AI agent with web search capabilities.
 You run in a terminal and must help the user by finding information on the web.
@@ -48,8 +71,9 @@ def web_search(query):
     url = 'https://lite.duckduckgo.com/lite/'
     data = urllib.parse.urlencode({'q': query}).encode('utf-8')
     req = urllib.request.Request(url, data=data, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+    timeout = config.get("timeout", 120)
     try:
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
             html = response.read().decode('utf-8')
             snippets = re.findall(r'<td class="result-snippet"[^>]*>(.*?)</td>', html, re.IGNORECASE | re.DOTALL)
             links = re.findall(r'<a class="result-url" href="([^"]+)">', html, re.IGNORECASE)
@@ -63,11 +87,18 @@ def web_search(query):
     except Exception as e:
         return f"Search failed: {e}"
 
-def fetch_url(url):
+def fetch_url(url, query="general_fetch"):
+    timeout = config.get("timeout", 120)
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
             html = response.read().decode('utf-8')
+            
+            # Security Audit of raw HTML
+            is_safe, risks = safety_engine.audit_source_chunk(query, url, html)
+            if not is_safe:
+                return f"Fetch denied by SafetyEngine. Risks: {'; '.join(risks)}"
+                
             body_match = re.search(r'<body[^>]*>(.*?)</body>', html, re.IGNORECASE | re.DOTALL)
             if body_match:
                 html = body_match.group(1)
@@ -75,33 +106,77 @@ def fetch_url(url):
             html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.IGNORECASE | re.DOTALL)
             text = strip_tags(html)
             text = re.sub(r'\s+', ' ', text)
+            
+            # Additional Audit on stripped text
+            is_safe, risks = safety_engine.audit_source_chunk(query, url, text[:3000])
+            if not is_safe:
+                 return f"Fetch denied by SafetyEngine after extraction. Risks: {'; '.join(risks)}"
+                 
             return text[:3000]
     except Exception as e:
         return f"Fetch failed: {e}"
 
 def chat_with_ollama(messages):
+    ollama_url = config.get("ollama_url").replace("/api/pull", "/api/chat") # Auto-fix old typo if present
+    model = config.get("model")
+    timeout = config.get("timeout", 120)
     data = {
-        "model": MODEL,
+        "model": model,
         "messages": messages,
         "stream": False,
         "format": "json"
     }
     try:
-        req = urllib.request.Request(OLLAMA_URL, data=json.dumps(data).encode('utf-8'), headers={'Content-Type': 'application/json'})
-        with urllib.request.urlopen(req) as response:
+        req = urllib.request.Request(ollama_url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, timeout=timeout) as response:
             res = json.loads(response.read().decode('utf-8'))
             return res['message']['content']
     except urllib.error.URLError as e:
-        return json.dumps({"action": "final_answer", "args": {"text": f"Error communicating with Ollama server at {OLLAMA_URL}. Is it running? Details: {e}"}})
+        return json.dumps({"action": "final_answer", "args": {"text": f"Error communicating with Ollama server at {ollama_url}. Is it running or did it time out? Details: {e}"}})
+    except KeyboardInterrupt:
+        # Re-raise KeyboardInterrupt so it can be handled by main
+        raise
     except Exception as e:
         return json.dumps({"action": "final_answer", "args": {"text": f"Error communicating with Ollama: {e}"}})
 
-def run_agent_loop(messages):
-    print("\n\x1b[35mAgent is thinking...\x1b[0m")
+def run_agent_loop(messages, query=""):
+    helper.print_info("Agent is thinking...")
     steps = 0
-    max_steps = 10
+    max_steps = config.get("max_steps", 10)
     
+    # Snapshot before execution
+    if query:
+        snapshot_id = snapshot_engine.create_snapshot(query)
+        helper.print_info(f"Snapshot created: {snapshot_id}")
+        
+        # Log to history.json
+        history_file = "agent-data/history.json"
+        history = []
+        if os.path.exists(history_file):
+            try:
+                with open(history_file, "r") as f: history = json.load(f)
+            except: pass
+        
+        history.append({
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "query": query,
+            "snapshot_id": snapshot_id
+        })
+        with open(history_file, "w") as f: json.dump(history, f, indent=4)
+        
+        # Hybrid Reasoning Phase
+        reasoning, actions = hybrid_engine.process_query(query, messages)
+        helper.log_live("reasoning", f"Hybrid Reasoning for: {query}", {"reasoning": reasoning, "recommended_actions": actions})
+        
+        # Inject the reasoning into context to guide the agent loop
+        intent_context = f"[Internal Reasoning] Intent: {reasoning.get('intent')}, Keywords: {reasoning.get('keywords')}. Recommended Search Sources: {actions.get('sources')}"
+        messages.append({"role": "system", "content": intent_context})
+        
     while steps < max_steps:
+        # Calculate context usage
+        total_tokens = token_counter.count_messages(messages)
+        helper.log_live("context", f"Context: {total_tokens} tokens", {"tokens": total_tokens})
+        
         response_text = chat_with_ollama(messages)
         messages.append({"role": "assistant", "content": response_text})
         
@@ -112,36 +187,240 @@ def run_agent_loop(messages):
             args = response_json.get("args", {})
             
             if thought:
-                print(f"\x1b[90mThought: {thought}\x1b[0m")
+                # Log thought to web with detail, keep CLI simple
+                text = f"\x1b[90mThought: {thought[:100]}...\x1b[0m"
+                print(text)
+                helper.log_console(text)
+                helper.log_live("thought", "Agent is thinking...", {"thought": thought})
                 
             if action == "final_answer":
-                print(f"\n\x1b[36mAgent:\x1b[0m {args.get('text', '')}")
+                text = args.get('text', '')
+                helper.log_live("action", "Final Answer provided", {"text": text})
+                print(f"\n\x1b[36mAgent:\x1b[0m {text}")
+                helper.log_console(f"Agent: {text}")
                 break
             elif action == "web_search":
-                query = args.get('query', '')
-                print(f"\x1b[33m[*] Searching the web for: {query}\x1b[0m")
-                result = web_search(query)
-                messages.append({"role": "user", "content": f"Search Results for '{query}':\n{result}"})
+                search_query = args.get('query', '')
+                helper.log_live("action", f"Searching: {search_query}", {"query": search_query})
+                text = f"\x1b[33m[*] Searching the web...\x1b[0m"
+                print(text)
+                helper.log_console(text)
+                result = web_search(search_query)
+                messages.append({"role": "user", "content": f"Search Results for '{search_query}':\n{result}"})
             elif action == "fetch_url":
                 url = args.get('url', '')
-                print(f"\x1b[33m[*] Fetching URL: {url}\x1b[0m")
-                result = fetch_url(url)
+                helper.log_live("action", f"Fetching: {url}", {"url": url})
+                text = f"\x1b[33m[*] Fetching remote content...\x1b[0m"
+                print(text)
+                helper.log_console(text)
+                result = fetch_url(url, query)
                 messages.append({"role": "user", "content": f"Content of {url}:\n{result}"})
             else:
                 messages.append({"role": "user", "content": f"Unknown action: {action}. Please use web_search, fetch_url, or final_answer."})
         except json.JSONDecodeError:
-            print("\x1b[31mError: Agent did not return valid JSON. Retrying...\x1b[0m")
+            helper.print_error("Agent did not return valid JSON. Retrying...")
             messages.append({"role": "user", "content": "Your previous response was not valid JSON. You MUST return ONLY a JSON object."})
             
         steps += 1
         
     if steps >= max_steps:
-        print("\n\x1b[31mAgent reached maximum steps and stopped.\x1b[0m")
+        helper.print_warning("Agent reached maximum steps and stopped.")
+
+def handle_command(cmd_input, messages):
+    parts = cmd_input.split()
+    cmd = parts[0].lower()
+    
+    if cmd == "/exit":
+        return "exit"
+    elif cmd == "/help":
+        help_text = (
+            "/help       - Show this help\n"
+            "/exit       - Exit interactive mode\n"
+            "/clear      - Clear the screen\n"
+            "/settings   - View current settings\n"
+            "/set k v    - Update a setting (e.g., /set model llama3)\n"
+            "/search q   - Perform a manual web search\n"
+            "/sysinfo    - Show system information\n"
+            "/train cmd  - Manage training data (add, list, clear, import)\n"
+            "/rollback   - Rollback to previous state (Tab key triggers this)\n"
+            "/web cmd    - Web Dashboard (start, stop)\n"
+            "/ollama cmd - Help for Ollama"
+        )
+        print(helper.format_box(help_text, title="Commands"))
+    elif cmd == "/clear":
+        helper.clear_screen()
+    elif cmd == "/settings":
+        settings = config.list_settings()
+        print(helper.format_box(json.dumps(settings, indent=4), title="Settings"))
+    elif cmd == "/set":
+        if len(parts) >= 3:
+            key = parts[1]
+            val = parts[2]
+            # Try to parse numeric or boolean values
+            if val.lower() == "true": val = True
+            elif val.lower() == "false": val = False
+            elif val.isdigit(): val = int(val)
+            config.set(key, val)
+            helper.print_success(f"Setting '{key}' updated to '{val}'")
+        else:
+            helper.print_error("Usage: /set <key> <value>")
+    elif cmd == "/search":
+        query = " ".join(parts[1:])
+        if query:
+            helper.print_info(f"Searching for: {query}")
+            results = web_search(query)
+            print(helper.format_box(results, title="Search Results"))
+        else:
+            helper.print_error("Usage: /search <query>")
+    elif cmd == "/sysinfo":
+        info = helper.get_system_info()
+        print(helper.format_box(json.dumps(info, indent=4), title="System Info"))
+    elif cmd == "/train":
+        training_file = "agent-data/training.json"
+        if len(parts) > 1:
+            sub_cmd = parts[1].lower()
+            if sub_cmd == "add":
+                content = " ".join(parts[2:])
+                if content:
+                    data = []
+                    if os.path.exists(training_file) and os.path.getsize(training_file) > 0:
+                        try:
+                            with open(training_file, "r") as f: data = json.load(f)
+                        except: data = []
+                    data.append(content)
+                    with open(training_file, "w") as f: json.dump(data, f, indent=4)
+                    helper.print_success(f"Added to training data: {content[:50]}...")
+                else:
+                    helper.print_error("Usage: /train add <content>")
+            elif sub_cmd == "list":
+                if os.path.exists(training_file) and os.path.getsize(training_file) > 0:
+                    try:
+                        with open(training_file, "r") as f: data = json.load(f)
+                        print(helper.format_box("\n".join([f"{i+1}. {item[:100]}..." for i, item in enumerate(data)]), title="Training Data"))
+                    except Exception as e:
+                        helper.print_error(f"Error reading training data: {e}")
+                else:
+                    helper.print_info("No training data found.")
+            elif sub_cmd == "clear":
+                with open(training_file, "w") as f: json.dump([], f, indent=4)
+                helper.print_success("Training data cleared.")
+            elif sub_cmd == "import":
+                if len(parts) > 2:
+                    import_path = parts[2]
+                    if os.path.exists(import_path):
+                        try:
+                            import_data_list = []
+                            # Handle ZIP files
+                            if import_path.lower().endswith(".zip"):
+                                with zipfile.ZipFile(import_path, 'r') as z:
+                                    # Look for conversations.json in the ZIP
+                                    for filename in z.namelist():
+                                        if filename.endswith("conversations.json"):
+                                            with z.open(filename) as f:
+                                                import_data_list.append(json.load(f))
+                                if not import_data_list:
+                                    helper.print_warning("No 'conversations.json' found inside the ZIP file.")
+                            else:
+                                # Handle raw JSON file
+                                with open(import_path, "r") as f:
+                                    import_data_list.append(json.load(f))
+                            
+                            total_new_items = 0
+                            data = []
+                            if os.path.exists(training_file) and os.path.getsize(training_file) > 0:
+                                try:
+                                    with open(training_file, "r") as f: data = json.load(f)
+                                except: data = []
+                                
+                            for import_data in import_data_list:
+                                new_items = []
+                                # Handle ChatGPT conversations.json format
+                                if isinstance(import_data, list):
+                                    for conv in import_data:
+                                        if "mapping" in conv:
+                                            for node_id in conv["mapping"]:
+                                                node = conv["mapping"][node_id]
+                                                if node.get("message") and node["message"].get("content") and node["message"]["content"].get("parts"):
+                                                    text = " ".join([p for p in node["message"]["content"]["parts"] if isinstance(p, str)])
+                                                    if text.strip():
+                                                        new_items.append(text.strip())
+                                
+                                if new_items:
+                                    data.extend(new_items)
+                                    total_new_items += len(new_items)
+                                    
+                            if total_new_items > 0:
+                                with open(training_file, "w") as f: json.dump(data, f, indent=4)
+                                helper.print_success(f"Imported {total_new_items} items from {import_path}")
+                            else:
+                                helper.print_warning("No valid text found in the import source.")
+                        except Exception as e:
+                            helper.print_error(f"Import failed: {e}")
+                    else:
+                        helper.print_error(f"File not found: {import_path}")
+                else:
+                    helper.print_error("Usage: /train import <file_path>")
+        else:
+            helper.print_info("Usage: /train [add|list|clear|import] [content|file]")
+    elif cmd == "/rollback":
+        steps = 1
+        if len(parts) > 1 and parts[1].isdigit():
+            steps = int(parts[1])
+        success, msg = snapshot_engine.rollback(steps)
+        if success:
+            helper.print_success(msg)
+        else:
+            helper.print_error(msg)
+    elif cmd == "/web":
+        from core.web_server import run_web_ui, stop_web_ui
+        sub_cmd = parts[1].lower() if len(parts) > 1 else "start"
+        
+        if sub_cmd == "start":
+            port = int(parts[2]) if len(parts) > 2 else 8080
+            run_web_ui(port=port)
+            # helper.print_success(f"Web Dashboard server started at http://localhost:{port}")
+        elif sub_cmd == "stop":
+            if stop_web_ui():
+                helper.print_success("Web Dashboard server stopped.")
+            else:
+                helper.print_warning("Web Dashboard server is not running.")
+        else:
+            helper.print_error("Usage: /web [start|stop] [port]")
+    elif cmd == "/ollama":
+        if len(parts) > 1 and parts[1] == "pull":
+            model = parts[2] if len(parts) > 2 else config.get("model")
+            helper.print_info(f"Attempting to pull model: {model}")
+            # Ollama pull implementation via urllib
+            ollama_url = config.get("ollama_url").replace("/chat", "/pull")
+            try:
+                data = json.dumps({"name": model}).encode('utf-8')
+                req = urllib.request.Request(ollama_url, data=data)
+                with urllib.request.urlopen(req) as response:
+                    print("Pulling started... (check Ollama server logs for progress)")
+            except Exception as e:
+                helper.print_error(f"Ollama pull failed: {e}")
+        else:
+            helper.print_info("Ollama Commands: /ollama pull [model]")
+    else:
+        helper.print_error(f"Unknown command: {cmd}")
+    return None
+
+def completer(text, state):
+    commands = ['/help', '/exit', '/clear', '/settings', '/set', '/search', '/sysinfo', '/train', '/rollback', '/ollama']
+    if not text:
+        # If no text is typed, Tab will suggest /rollback
+        return "/rollback" if state == 0 else None
+    
+    matches = [c for c in commands if c.startswith(text)]
+    if state < len(matches):
+        return matches[state]
+    return None
 
 def main():
-    parser = argparse.ArgumentParser(description="ETHUB CLI - Isolated Terminal Agent")
+    parser = argparse.ArgumentParser(description="ETHUB CLI - Advanced Terminal Agent")
     parser.add_argument("query", nargs="?", help="The question or task for the agent")
     parser.add_argument("--interactive", "-i", action="store_true", help="Start interactive mode")
+    parser.add_argument("--no-intro", action="store_true", help="Skip the intro animation")
     
     args = parser.parse_args()
     
@@ -149,28 +428,58 @@ def main():
         parser.print_help()
         sys.exit(1)
         
-    print(f"\x1b[36mETHUB CLI Agent initialized. Model: {MODEL}\x1b[0m")
+    initial_dir = os.getcwd()
+    
+    # Run intro only if not skipped
+    if not args.no_intro and sys.stdout.isatty():
+        from ui.rainbow_animation import draw_header
+        # Small animation at start
+        run_intro(initial_dir=initial_dir, frames=30)
+    
+    helper.print_info(f"ETHUB CLI Agent initialized. Model: {config.get('model')}")
     
     if args.interactive:
-        print("Interactive mode started. Type 'exit' to quit.")
+        # Auto-start Web UI
+        from core.web_server import run_web_ui
+        run_web_ui(port=8080)
+        # helper.print_success("Web Dashboard active on port 8080")
+
+        # Setup Tab key for Rollback / Autocomplete
+        readline.parse_and_bind("tab: complete")
+        readline.set_completer(completer)
+        
+        helper.print_info("Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback.")
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        
+        from core.web_server import _httpd
+        
         while True:
             try:
-                user_input = input("\n\x1b[32mYou:\x1b[0m ")
-                if user_input.lower() in ['exit', 'quit']:
-                    break
-                if not user_input.strip():
+                # Optionally redraw header at the top
+                # print("\x1b[H", end="") 
+                
+                status_tag = f"\x1b[90m[WEB]\x1b[0m " if _httpd else ""
+                user_input = input(f"\n{status_tag}\x1b[32mETHUB>\x1b[0m ").strip()
+                if not user_input:
                     continue
+                
+                if user_input.startswith("/"):
+                    status = handle_command(user_input, messages)
+                    if status == "exit":
+                        break
+                    continue
+                    
                 messages.append({"role": "user", "content": user_input})
-                run_agent_loop(messages)
+                run_agent_loop(messages, query=user_input)
             except (KeyboardInterrupt, EOFError):
+                print("\nExiting...")
                 break
     else:
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": args.query}
         ]
-        run_agent_loop(messages)
+        run_agent_loop(messages, query=args.query)
 
 if __name__ == "__main__":
     main()

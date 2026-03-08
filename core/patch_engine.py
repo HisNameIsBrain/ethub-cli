@@ -7,6 +7,9 @@ class PatchEngine:
 
     def generate_patch(self, file_path, new_content, query):
         """Generates a minimal diff-only patch."""
+        if "../" in file_path or file_path.startswith("/root") or file_path.startswith("/system"):
+            return {"file_path": file_path, "patch": "", "is_safe": False, "risks": ["File traversal attempt blocked by PatchEngine."]}
+
         if not os.path.exists(file_path):
             # For new files, the diff is the entire content
             old_content = ""
@@ -35,6 +38,9 @@ class PatchEngine:
 
     def apply_patch(self, file_path, new_content):
         """Applies the patch by writing the new content."""
+        if "../" in file_path or file_path.startswith("/root") or file_path.startswith("/system"):
+            return False
+
         # Ensure directory exists
         os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
         with open(file_path, "w") as f:

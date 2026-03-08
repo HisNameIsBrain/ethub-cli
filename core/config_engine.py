@@ -7,6 +7,7 @@ class ConfigEngine:
         "ollama_url": "http://127.0.0.1:11434/api/chat",
         "search_enabled": True,
         "max_steps": 10,
+        "timeout": 120,
         "theme": "rainbow",
         "search_engines": ["google", "github", "wiki", "stackoverflow"]
     }

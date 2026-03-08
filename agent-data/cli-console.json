@@ -1,0 +1,142 @@
+[
+    {
+        "timestamp": "2026-03-08 05:39:29",
+        "text": "\u001b[36m[INFO]\u001b[0m ETHUB CLI Agent initialized. Model: qwen2.5:0.5b"
+    },
+    {
+        "timestamp": "2026-03-08 05:39:29",
+        "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
+    },
+    {
+        "timestamp": "2026-03-08 05:42:24",
+        "text": "\u001b[36m[INFO]\u001b[0m ETHUB CLI Agent initialized. Model: qwen2.5:0.5b"
+    },
+    {
+        "timestamp": "2026-03-08 05:42:25",
+        "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
+    },
+    {
+        "timestamp": "2026-03-08 05:42:48",
+        "text": "\u001b[36m[INFO]\u001b[0m Ollama Commands: /ollama pull [model]"
+    },
+    {
+        "timestamp": "2026-03-08 05:42:51",
+        "text": "\u001b[36m[INFO]\u001b[0m Ollama Commands: /ollama pull [model]"
+    },
+    {
+        "timestamp": "2026-03-08 05:44:08",
+        "text": "\u001b[36m[INFO]\u001b[0m Searching for: q What other helpers could a web search agent have"
+    },
+    {
+        "timestamp": "2026-03-08 05:44:47",
+        "text": "\u001b[36m[INFO]\u001b[0m Agent is thinking..."
+    },
+    {
+        "timestamp": "2026-03-08 05:44:47",
+        "text": "\u001b[36m[INFO]\u001b[0m Snapshot created: 20260308_054447_531142"
+    },
+    {
+        "timestamp": "2026-03-08 05:44:57",
+        "text": "Agent: Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
+    },
+    {
+        "timestamp": "2026-03-08 05:45:23",
+        "text": "\u001b[36m[INFO]\u001b[0m ETHUB CLI Agent initialized. Model: qwen2.5:0.5b"
+    },
+    {
+        "timestamp": "2026-03-08 05:45:23",
+        "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
+    },
+    {
+        "timestamp": "2026-03-08 07:02:58",
+        "text": "\u001b[36m[INFO]\u001b[0m ETHUB CLI Agent initialized. Model: qwen2.5:0.5b"
+    },
+    {
+        "timestamp": "2026-03-08 07:02:58",
+        "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
+    },
+    {
+        "timestamp": "2026-03-08 07:03:59",
+        "text": "\u001b[31m[ERROR]\u001b[0m Unknown command: /helo"
+    },
+    {
+        "timestamp": "2026-03-08 07:04:16",
+        "text": "\u001b[32m[SUCCESS]\u001b[0m Rolled back to: What other helpers could a web search agent have (2026-03-08T05:44:47.539873)"
+    },
+    {
+        "timestamp": "2026-03-08 07:04:47",
+        "text": "\u001b[32m[SUCCESS]\u001b[0m Rolled back to: What other helpers could a web search agent have (2026-03-08T05:44:47.539873)"
+    },
+    {
+        "timestamp": "2026-03-08 07:05:01",
+        "text": "\u001b[32m[SUCCESS]\u001b[0m Rolled back to: What other helpers could a web search agent have (2026-03-08T05:44:47.539873)"
+    },
+    {
+        "timestamp": "2026-03-08 07:06:11",
+        "text": "\u001b[36m[INFO]\u001b[0m Agent is thinking..."
+    },
+    {
+        "timestamp": "2026-03-08 07:06:11",
+        "text": "\u001b[36m[INFO]\u001b[0m Snapshot created: 20260308_070611_343555"
+    },
+    {
+        "timestamp": "2026-03-08 07:06:20",
+        "text": "Agent: Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
+    },
+    {
+        "timestamp": "2026-03-08 07:07:04",
+        "text": "\u001b[36m[INFO]\u001b[0m Agent is thinking..."
+    },
+    {
+        "timestamp": "2026-03-08 07:07:04",
+        "text": "\u001b[36m[INFO]\u001b[0m Snapshot created: 20260308_070704_700689"
+    },
+    {
+        "timestamp": "2026-03-08 07:07:13",
+        "text": "Agent: Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
+    },
+    {
+        "timestamp": "2026-03-08 07:09:48",
+        "text": "\u001b[31m[ERROR]\u001b[0m Usage: /set <key> <value>"
+    },
+    {
+        "timestamp": "2026-03-08 07:09:53",
+        "text": "\u001b[31m[ERROR]\u001b[0m Usage: /set <key> <value>"
+    },
+    {
+        "timestamp": "2026-03-08 07:10:05",
+        "text": "\u001b[32m[SUCCESS]\u001b[0m Setting 'ollama' updated to 'qwen2.5:0.5b'"
+    },
+    {
+        "timestamp": "2026-03-08 07:10:27",
+        "text": "\u001b[36m[INFO]\u001b[0m ETHUB CLI Agent initialized. Model: qwen2.5:0.5b"
+    },
+    {
+        "timestamp": "2026-03-08 07:10:27",
+        "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
+    },
+    {
+        "timestamp": "2026-03-08 07:10:54",
+        "text": "\u001b[36m[INFO]\u001b[0m Agent is thinking..."
+    },
+    {
+        "timestamp": "2026-03-08 07:10:54",
+        "text": "\u001b[36m[INFO]\u001b[0m Snapshot created: 20260308_071054_846171"
+    },
+    {
+        "timestamp": "2026-03-08 07:11:04",
+        "text": "Agent: Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
+    },
+    {
+        "timestamp": "2026-03-08 07:14:10",
+        "text": "\u001b[31m[ERROR]\u001b[0m Unknown command: /"
+    },
+    {
+        "timestamp": "2026-03-08 07:14:14",
+        "text": "\u001b[31m[ERROR]\u001b[0m Unknown command: /web."
+    },
+    {
+        "timestamp": "2026-03-08 07:15:03",
+        "text": "\u001b[36m[INFO]\u001b[0m Searching for: \"Analyze dashboard web in my folder and change \""
+    }
+]

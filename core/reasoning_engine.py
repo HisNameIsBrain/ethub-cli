@@ -1,24 +1,39 @@
 import json
-import ollama
+import urllib.request
+import os
 
 class ReasoningEngine:
     def __init__(self, model="qwen2.5:0.5b"):
         self.model = model
+        # Import config to get URL, but avoid circular import if possible
+        # We'll default to the standard Ollama local URL
+        self.ollama_url = "http://127.0.0.1:11434/api/chat"
 
     def analyze(self, query):
-        """Uses local Ollama to classify the intent of the ETHUB request."""
+        """Uses local Ollama via urllib to classify the intent of the ETHUB request."""
         try:
-            # System prompt ensures the model acts as part of the ETHUB core
-            response = ollama.chat(model=self.model, messages=[
-                {
-                    'role': 'system', 
-                    'content': 'You are the ETHUB Reasoning Engine. Classify queries into: code_query, hardware_query, or general_query. Reply ONLY with a JSON object: {"query_type": "type", "intent": "intent", "keywords": ["kw1", "kw2"]}'
-                },
-                {'role': 'user', 'content': query}
-            ])
+            payload = {
+                "model": self.model,
+                "messages": [
+                    {
+                        'role': 'system', 
+                        'content': 'You are the ETHUB Reasoning Engine. Classify queries into: code_query, hardware_query, or general_query. Reply ONLY with a JSON object: {"query_type": "type", "intent": "intent", "keywords": ["kw1", "kw2"]}'
+                    },
+                    {'role': 'user', 'content': query}
+                ],
+                "stream": False,
+                "format": "json"
+            }
             
-            # Cleanly parse the model's JSON response
-            raw_content = response['message']['content']
+            req = urllib.request.Request(
+                self.ollama_url, 
+                data=json.dumps(payload).encode('utf-8'), 
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            with urllib.request.urlopen(req, timeout=30) as response:
+                res = json.loads(response.read().decode('utf-8'))
+                raw_content = res['message']['content']
             
             # Attempt to parse JSON from the response
             try:

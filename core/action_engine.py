@@ -1,21 +1,35 @@
-import ollama
+import urllib.request
 import json
 
 class ActionEngine:
     def __init__(self, model="qwen2.5:0.5b"):
         self.model = model
+        self.ollama_url = "http://127.0.0.1:11434/api/chat"
 
     def decide_actions(self, reasoning):
         """Decide what operations to perform based on reasoning via Ollama."""
         try:
             prompt = f"Based on this reasoning: {json.dumps(reasoning)}, what search sources should be used? Available: google, github, stackoverflow, dev.to, wikipedia, substack, npm. Reply ONLY with a JSON object: {{\"action\": \"web_search\", \"sources\": [\"source1\", \"source2\"]}}"
             
-            response = ollama.chat(model=self.model, messages=[
-                {'role': 'system', 'content': 'You are the ETHUB Action Engine. Select the best information sources for a query.'},
-                {'role': 'user', 'content': prompt}
-            ])
+            payload = {
+                "model": self.model,
+                "messages": [
+                    {'role': 'system', 'content': 'You are the ETHUB Action Engine. Select the best information sources for a query.'},
+                    {'role': 'user', 'content': prompt}
+                ],
+                "stream": False,
+                "format": "json"
+            }
+
+            req = urllib.request.Request(
+                self.ollama_url, 
+                data=json.dumps(payload).encode('utf-8'), 
+                headers={'Content-Type': 'application/json'}
+            )
             
-            raw_content = response['message']['content']
+            with urllib.request.urlopen(req, timeout=30) as response:
+                res = json.loads(response.read().decode('utf-8'))
+                raw_content = res['message']['content']
             
             try:
                 # Basic cleanup if model adds markdown formatting

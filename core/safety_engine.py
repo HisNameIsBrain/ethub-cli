@@ -10,7 +10,7 @@ class SafetyEngine:
         self.rules = self._load_rules()
         self.allowed_domains = [
             "github.com", "dev.to", "substack.com", "wikipedia.org", 
-            "google.com", "youtube.com", "stackoverflow.com", "npm.org", "npmjs.com"
+            "google.com", "youtube.com"
         ]
 
     def _load_rules(self):

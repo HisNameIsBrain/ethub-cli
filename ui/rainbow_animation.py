@@ -80,5 +80,7 @@ def run_intro(initial_dir=".", frames=40):
             print("\x1b[H", end="") # Move to top
             draw_header(frame, initial_dir)
             time.sleep(0.03)
+    except KeyboardInterrupt:
+        pass
     finally:
         print("\x1b[?25h", end="")  # Show cursor
