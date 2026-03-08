@@ -4,7 +4,7 @@ import re
 from core.reasoning_engine import ReasoningEngine
 from core.action_engine import ActionEngine
 from core.safety_engine import SafetyEngine
-from core.snapshot_engine import SnapshotEngine
+from core.return_engine import EthubReturnEngine
 from core.config_engine import ConfigEngine
 
 class HybridEngine:
@@ -13,7 +13,7 @@ class HybridEngine:
         self.reasoner = ReasoningEngine(model=self.config.get("model"))
         self.actor = ActionEngine(model=self.config.get("model"))
         self.safety = SafetyEngine()
-        self.snapshot = SnapshotEngine()
+        self.return_engine = EthubReturnEngine()
         self.training_file = "agent-data/training.json"
 
     def get_local_knowledge(self, query, top_k=3):

@@ -46,43 +46,78 @@ class WebHandler(http.server.SimpleHTTPRequestHandler):
             super().do_GET()
 
     def handle_api(self):
-        endpoint = self.path.split("/")[-1]
-        data_dir = os.path.join(os.getcwd(), "agent-data")
-        file_map = {
-            "history": "history.json",
-            "settings": "config.json",
-            "risks": "dependabot-risks.json",
-            "memory": "memory.json",
-            "results": "results.json",
-            "logs": "live_logs.json",
-            "cli-console": "cli-console.json",
-            "server-logs": "server-logs.json",
-            "sysinfo": "sysinfo" # Special case
-        }
+        try:
+            endpoint = self.path.split("/")[-1]
+            data_dir = os.path.join(os.getcwd(), "agent-data")
+            file_map = {
+                "history": "history.json",
+                "settings": "config.json",
+                "risks": "dependabot-risks.json",
+                "memory": "memory.json",
+                "results": "results.json",
+                "logs": "live_logs.json",
+                "cli-console": "cli-console.json",
+                "server-logs": "server-logs.json",
+                "sysinfo": "sysinfo",
+                "return-points": "return-points",
+                "snapshots": "snapshots",
+                "system-prompt": "system-prompt",
+                "tools-list": "tools-list"
+            }
 
-        if endpoint in file_map:
-            self.send_response(200)
+            if endpoint in file_map:
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+
+                if endpoint == "sysinfo":
+                    from core.helper_engine import HelperEngine
+                    response = HelperEngine.get_system_info()
+                elif endpoint == "system-prompt":
+                    from ethub_cli import SYSTEM_PROMPT
+                    response = {"prompt": SYSTEM_PROMPT}
+                elif endpoint == "tools-list":
+                    response = {
+                        "tools": [
+                            {"name": "web_search", "desc": "Internet queries"},
+                            {"name": "fetch_url", "desc": "Read webpage content"},
+                            {"name": "ethub_action", "desc": "Surgical filesystem actions"},
+                            {"name": "final_answer", "desc": "Resolution to user"}
+                        ]
+                    }
+                elif endpoint == "return-points":
+                    from core.return_engine import EthubReturnEngine
+                    re_eng = EthubReturnEngine()
+                    response = re_eng.list_return_points()
+                elif endpoint == "snapshots":
+                    from core.surgical_engine import EthubActionEngine
+                    ae_eng = EthubActionEngine()
+                    snapshot_dir = ae_eng.snapshot_dir
+                    if snapshot_dir.exists():
+                        response = [f.name for f in snapshot_dir.glob("*.bak")]
+                    else:
+                        response = []
+                else:
+                    file_path = os.path.join(data_dir, file_map[endpoint])
+                    if os.path.exists(file_path):
+                        with open(file_path, "r") as f:
+                            try:
+                                response = json.load(f)
+                            except:
+                                response = [] if endpoint not in ["settings"] else {}
+                    else:
+                        response = [] if endpoint not in ["settings"] else {}
+                
+                self.wfile.write(json.dumps(response).encode("utf-8"))
+            else:
+                self.send_error(404, "Endpoint not found")
+        except Exception as e:
+            self.send_response(500)
             self.send_header("Content-type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
-
-            if endpoint == "sysinfo":
-                from core.helper_engine import HelperEngine
-                response = HelperEngine.get_system_info()
-            else:
-                file_path = os.path.join(data_dir, file_map[endpoint])
-                if os.path.exists(file_path):
-                    with open(file_path, "r") as f:
-                        try:
-                            response = json.load(f)
-                        except:
-                            response = [] if endpoint not in ["settings"] else {}
-                else:
-                    response = [] if endpoint not in ["settings"] else {}
-            
-            self.wfile.write(json.dumps(response).encode("utf-8"))
-        else:
-            self.send_error(404, "Endpoint not found")
+            self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
 
     def do_POST(self):
         if self.path == "/api/settings":
@@ -100,6 +135,49 @@ class WebHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
                 self.wfile.write(json.dumps({"status": "success"}).encode("utf-8"))
+            except Exception as e:
+                self.send_response(400)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+        elif self.path == "/api/action":
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            try:
+                data = json.loads(post_data.decode('utf-8'))
+                action = data.get("action")
+                response = {"status": "error", "message": f"Action '{action}' unknown"}
+
+                if action == "capture_point":
+                    from core.return_engine import EthubReturnEngine
+                    re_eng = EthubReturnEngine()
+                    rid = re_eng.capture_point(label=data.get("label", "Web Dashboard Point"))
+                    response = {"status": "success", "id": rid}
+                elif action == "rollback_surgical":
+                    from core.return_engine import EthubReturnEngine
+                    re_eng = EthubReturnEngine()
+                    msg = re_eng.rollback_surgical_fix(data.get("file_name"))
+                    response = {"status": "success", "message": msg}
+                elif action == "restore":
+                    from core.return_engine import EthubReturnEngine
+                    re_eng = EthubReturnEngine()
+                    msg = re_eng.restore_to(data.get("id"))
+                    response = {"status": "success", "message": msg}
+                elif action == "clear_logs":
+                    log_file = os.path.join(os.getcwd(), "agent-data", "live_logs.json")
+                    with open(log_file, "w") as f:
+                        json.dump([], f)
+                    response = {"status": "success"}
+                elif action == "list_files":
+                    from core.surgical_engine import EthubActionEngine
+                    ae_eng = EthubActionEngine()
+                    response = {"status": "success", "files": ae_eng.list_files()}
+
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(json.dumps(response).encode("utf-8"))
             except Exception as e:
                 self.send_response(400)
                 self.send_header("Access-Control-Allow-Origin", "*")

@@ -17,11 +17,11 @@ from html.parser import HTMLParser
 try:
     from core.config_engine import ConfigEngine
     from core.helper_engine import HelperEngine
-    from core.snapshot_engine import SnapshotEngine
     from core.safety_engine import SafetyEngine
     from core.hybrid_engine import HybridEngine
+    from core.surgical_engine import EthubActionEngine, EthubSurgicalEngine
+    from core.return_engine import EthubReturnEngine
     from ui.rainbow_animation import run_intro
-    from test_token_counter import TokenCounter
 except ImportError as e:
     print(f"Error importing core components: {e}")
     sys.exit(1)
@@ -29,17 +29,32 @@ except ImportError as e:
 # Load configuration
 config = ConfigEngine()
 helper = HelperEngine()
-snapshot_engine = SnapshotEngine()
 safety_engine = SafetyEngine()
 hybrid_engine = HybridEngine()
-token_counter = TokenCounter()
+action_engine = EthubActionEngine()
+surgical_engine = EthubSurgicalEngine()
+return_engine = EthubReturnEngine()
 
 SYSTEM_PROMPT = """You are an autonomous AI agent with web search capabilities.
 You run in a terminal and must help the user by finding information on the web.
 You have access to the following tools:
 1. "web_search": Searches the internet. Requires argument "query".
 2. "fetch_url": Fetches text content from a specific URL. Requires argument "url".
-3. "final_answer": Provides the final response to the user. Requires argument "text".
+3. "ethub_action": Performs surgical directory actions (list, read, patch). Requires "sub" (list/read/patch) and "target" (file path). For "patch", also requires "content".
+4. "final_answer": Provides the final response to the user. Requires argument "text".
+
+### 🏗️ Strategic Formatting Hierarchy
+When you process code, debugging information, or errors, you MUST use the following Semantic Labels:
+1. [FIELD: REASON]: Defines the technical "why" behind an error.
+2. [FIELD: FIX_CMDS]: Lists the exact shell instructions required for resolution.
+3. [FIELD: DIFF_PATCH]: Surgical code comparison using unified diff syntax.
+4. [FIELD: SNIPPET]: Direct code fragment relevant to the fix.
+5. [FIELD: AUDIT]: Security audit trail of the proposed fix.
+6. [FIELD: RETURN]: Feedback on restoration or rollback actions.
+
+For simple technical questions, use:
+- [FIELD: KEY POINTS]: Bulleted chunks for listing "Key Points" or technical facts.
+- [FIELD: SOLUTION]: Syntax-highlighted code block for the solution.
 
 You must ALWAYS respond with ONLY a valid JSON object in the following format:
 {
@@ -116,6 +131,19 @@ def fetch_url(url, query="general_fetch"):
     except Exception as e:
         return f"Fetch failed: {e}"
 
+def ethub_action(sub, target=None, content=None):
+    """Executes a surgical action using the EthubActionEngine."""
+    if sub == "list":
+        return action_engine.list_files()
+    elif sub == "read":
+        if not target: return "Error: 'target' file name required for read."
+        return action_engine.read_target(target)
+    elif sub == "patch":
+        if not target or not content: return "Error: 'target' and 'content' required for patch."
+        return action_engine.apply_patch(target, content)
+    else:
+        return f"Unknown sub-action: {sub}. Use list, read, or patch."
+
 def chat_with_ollama(messages):
     ollama_url = config.get("ollama_url").replace("/api/pull", "/api/chat") # Auto-fix old typo if present
     model = config.get("model")
@@ -146,8 +174,8 @@ def run_agent_loop(messages, query=""):
     
     # Snapshot before execution
     if query:
-        snapshot_id = snapshot_engine.create_snapshot(query)
-        helper.print_info(f"Snapshot created: {snapshot_id}")
+        return_id = return_engine.capture_point(label=f"Query: {query[:50]}")
+        helper.print_info(f"Return point captured: {return_id}")
         
         # Log to history.json
         history_file = "agent-data/history.json"
@@ -160,7 +188,7 @@ def run_agent_loop(messages, query=""):
         history.append({
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "query": query,
-            "snapshot_id": snapshot_id
+            "return_id": return_id
         })
         with open(history_file, "w") as f: json.dump(history, f, indent=4)
         
@@ -173,10 +201,6 @@ def run_agent_loop(messages, query=""):
         messages.append({"role": "system", "content": intent_context})
         
     while steps < max_steps:
-        # Calculate context usage
-        total_tokens = token_counter.count_messages(messages)
-        helper.log_live("context", f"Context: {total_tokens} tokens", {"tokens": total_tokens})
-        
         response_text = chat_with_ollama(messages)
         messages.append({"role": "assistant", "content": response_text})
         
@@ -195,6 +219,26 @@ def run_agent_loop(messages, query=""):
                 
             if action == "final_answer":
                 text = args.get('text', '')
+                
+                # Check for surgical fix patterns and perform audit
+                audit_info = ""
+                if "[FIELD: FIX_CMDS]" in text or "[FIELD: DIFF_PATCH]" in text:
+                    helper.print_info("Performing security audit on proposed fix...")
+                    # Extract for audit (rough extraction)
+                    fix_cmds = re.search(r'\[FIELD: FIX_CMDS\](.*?)(?=\[FIELD:|$)', text, re.DOTALL)
+                    diff_patch = re.search(r'\[FIELD: DIFF_PATCH\](.*?)(?=\[FIELD:|$)', text, re.DOTALL)
+                    
+                    cmd_val = fix_cmds.group(1).strip() if fix_cmds else ""
+                    patch_val = diff_patch.group(1).strip() if diff_patch else ""
+                    
+                    is_safe, audit_msg = safety_engine.perform_surgical_audit(cmd_val, patch_val)
+                    if not is_safe:
+                        text += f"\n\n### [FIELD: AUDIT]\nCRITICAL: {audit_msg}\nPROCEED WITH CAUTION."
+                        helper.print_warning(f"Audit Warning: {audit_msg}")
+                    else:
+                        audit_info = f"\n\n### [FIELD: AUDIT]\n{audit_msg}"
+                        text += audit_info
+                
                 helper.log_live("action", "Final Answer provided", {"text": text})
                 print(f"\n\x1b[36mAgent:\x1b[0m {text}")
                 helper.log_console(f"Agent: {text}")
@@ -215,8 +259,18 @@ def run_agent_loop(messages, query=""):
                 helper.log_console(text)
                 result = fetch_url(url, query)
                 messages.append({"role": "user", "content": f"Content of {url}:\n{result}"})
+            elif action == "ethub_action":
+                sub = args.get('sub', '')
+                target = args.get('target', '')
+                content = args.get('content', '')
+                helper.log_live("action", f"Surgical Action: {sub} {target}", {"sub": sub, "target": target})
+                text = f"\x1b[35m[*] Executing surgical {sub} on {target}...\x1b[0m"
+                print(text)
+                helper.log_console(text)
+                result = ethub_action(sub, target, content)
+                messages.append({"role": "user", "content": f"Result of surgical {sub}:\n{result}"})
             else:
-                messages.append({"role": "user", "content": f"Unknown action: {action}. Please use web_search, fetch_url, or final_answer."})
+                messages.append({"role": "user", "content": f"Unknown action: {action}. Please use web_search, fetch_url, ethub_action, or final_answer."})
         except json.JSONDecodeError:
             helper.print_error("Agent did not return valid JSON. Retrying...")
             messages.append({"role": "user", "content": "Your previous response was not valid JSON. You MUST return ONLY a JSON object."})
@@ -242,11 +296,11 @@ def handle_command(cmd_input, messages):
             "/search q   - Perform a manual web search\n"
             "/sysinfo    - Show system information\n"
             "/train cmd  - Manage training data (add, list, clear, import)\n"
-            "/rollback   - Rollback to previous state (Tab key triggers this)\n"
+            "/return cmd - System Recovery (list, <point_id>)\n"
             "/web cmd    - Web Dashboard (start, stop)\n"
             "/ollama cmd - Help for Ollama"
         )
-        print(helper.format_box(help_text, title="Commands"))
+        print(helper.format_box(help_text, title="ETHUB SURGICAL COMMANDS"))
     elif cmd == "/clear":
         helper.clear_screen()
     elif cmd == "/settings":
@@ -362,15 +416,17 @@ def handle_command(cmd_input, messages):
                     helper.print_error("Usage: /train import <file_path>")
         else:
             helper.print_info("Usage: /train [add|list|clear|import] [content|file]")
-    elif cmd == "/rollback":
-        steps = 1
-        if len(parts) > 1 and parts[1].isdigit():
-            steps = int(parts[1])
-        success, msg = snapshot_engine.rollback(steps)
-        if success:
-            helper.print_success(msg)
+    elif cmd == "/return":
+        if len(parts) > 1:
+            sub = parts[1].lower()
+            if sub == "list":
+                points = return_engine.list_return_points()
+                print(helper.format_box("\n".join(points), title="Return Points"))
+            else:
+                # Assume it's an ID
+                print(return_engine.restore_to(parts[1]))
         else:
-            helper.print_error(msg)
+            helper.print_error("Usage: /return [list | <point_id>]")
     elif cmd == "/web":
         from core.web_server import run_web_ui, stop_web_ui
         sub_cmd = parts[1].lower() if len(parts) > 1 else "start"
@@ -406,10 +462,10 @@ def handle_command(cmd_input, messages):
     return None
 
 def completer(text, state):
-    commands = ['/help', '/exit', '/clear', '/settings', '/set', '/search', '/sysinfo', '/train', '/rollback', '/ollama']
+    commands = ['/help', '/exit', '/clear', '/settings', '/set', '/search', '/sysinfo', '/train', '/return', '/web', '/ollama']
     if not text:
-        # If no text is typed, Tab will suggest /rollback
-        return "/rollback" if state == 0 else None
+        # If no text is typed, Tab will suggest /return
+        return "/return" if state == 0 else None
     
     matches = [c for c in commands if c.startswith(text)]
     if state < len(matches):

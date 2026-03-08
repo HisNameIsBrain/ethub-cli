@@ -1,142 +1,252 @@
 [
     {
-        "timestamp": "08/Mar/2026 06:52:32",
+        "timestamp": "08/Mar/2026 15:14:18",
         "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
+        "message": "\"GET /api/memory HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 06:52:32",
+        "timestamp": "08/Mar/2026 15:14:18",
         "client": "127.0.0.1",
-        "message": "code 404, message File not found"
+        "message": "code 404, message Endpoint not found"
     },
     {
-        "timestamp": "08/Mar/2026 06:52:32",
+        "timestamp": "08/Mar/2026 15:14:18",
         "client": "127.0.0.1",
-        "message": "\"GET /favicon.ico HTTP/1.1\" 404 -"
+        "message": "\"GET /api/training HTTP/1.1\" 404 -"
     },
     {
-        "timestamp": "08/Mar/2026 06:52:32",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/server-logs HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 06:52:32",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 06:52:32",
+        "timestamp": "08/Mar/2026 15:14:18",
         "client": "127.0.0.1",
         "message": "\"GET /api/sysinfo HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 06:52:32",
+        "timestamp": "08/Mar/2026 15:14:18",
         "client": "127.0.0.1",
-        "message": "\"GET /api/history HTTP/1.1\" 200 -"
+        "message": "code 404, message Endpoint not found"
     },
     {
-        "timestamp": "08/Mar/2026 06:52:33",
+        "timestamp": "08/Mar/2026 15:14:18",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/system-prompt HTTP/1.1\" 404 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:21",
         "client": "127.0.0.1",
         "message": "\"GET /api/logs HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 06:52:33",
+        "timestamp": "08/Mar/2026 15:14:21",
         "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
+        "message": "code 404, message Endpoint not found"
     },
     {
-        "timestamp": "08/Mar/2026 06:52:33",
+        "timestamp": "08/Mar/2026 15:14:21",
         "client": "127.0.0.1",
-        "message": "\"GET /api/server-logs HTTP/1.1\" 200 -"
+        "message": "\"GET /api/return-points HTTP/1.1\" 404 -"
     },
     {
-        "timestamp": "08/Mar/2026 06:52:33",
+        "timestamp": "08/Mar/2026 15:14:21",
         "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
+        "message": "code 404, message Endpoint not found"
     },
     {
-        "timestamp": "08/Mar/2026 06:52:33",
+        "timestamp": "08/Mar/2026 15:14:21",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/snapshots HTTP/1.1\" 404 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:21",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/memory HTTP/1.1\" 200 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:21",
+        "client": "127.0.0.1",
+        "message": "code 404, message Endpoint not found"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:21",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/training HTTP/1.1\" 404 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:21",
         "client": "127.0.0.1",
         "message": "\"GET /api/sysinfo HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 06:52:33",
+        "timestamp": "08/Mar/2026 15:14:21",
         "client": "127.0.0.1",
-        "message": "\"GET /api/history HTTP/1.1\" 200 -"
+        "message": "code 404, message Endpoint not found"
     },
     {
-        "timestamp": "08/Mar/2026 06:52:35",
+        "timestamp": "08/Mar/2026 15:14:21",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/system-prompt HTTP/1.1\" 404 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:23",
         "client": "127.0.0.1",
         "message": "\"GET /api/logs HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 06:52:35",
+        "timestamp": "08/Mar/2026 15:14:23",
         "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
+        "message": "code 404, message Endpoint not found"
     },
     {
-        "timestamp": "08/Mar/2026 06:52:35",
+        "timestamp": "08/Mar/2026 15:14:23",
         "client": "127.0.0.1",
-        "message": "\"GET /api/server-logs HTTP/1.1\" 200 -"
+        "message": "\"GET /api/return-points HTTP/1.1\" 404 -"
     },
     {
-        "timestamp": "08/Mar/2026 06:52:35",
+        "timestamp": "08/Mar/2026 15:14:23",
         "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
+        "message": "code 404, message Endpoint not found"
     },
     {
-        "timestamp": "08/Mar/2026 06:52:35",
+        "timestamp": "08/Mar/2026 15:14:23",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/snapshots HTTP/1.1\" 404 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:23",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/memory HTTP/1.1\" 200 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:23",
+        "client": "127.0.0.1",
+        "message": "code 404, message Endpoint not found"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:23",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/training HTTP/1.1\" 404 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:23",
         "client": "127.0.0.1",
         "message": "\"GET /api/sysinfo HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 06:52:35",
+        "timestamp": "08/Mar/2026 15:14:23",
         "client": "127.0.0.1",
-        "message": "\"GET /api/history HTTP/1.1\" 200 -"
+        "message": "code 404, message Endpoint not found"
     },
     {
-        "timestamp": "08/Mar/2026 06:52:36",
+        "timestamp": "08/Mar/2026 15:14:23",
         "client": "127.0.0.1",
-        "message": "\"GET / HTTP/1.1\" 200 -"
+        "message": "\"GET /api/system-prompt HTTP/1.1\" 404 -"
     },
     {
-        "timestamp": "08/Mar/2026 06:53:12",
+        "timestamp": "08/Mar/2026 15:14:26",
         "client": "127.0.0.1",
-        "message": "\"GET / HTTP/1.1\" 304 -"
+        "message": "\"GET /api/logs HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 06:54:02",
+        "timestamp": "08/Mar/2026 15:14:26",
         "client": "127.0.0.1",
-        "message": "\"GET / HTTP/1.1\" 200 -"
+        "message": "code 404, message Endpoint not found"
     },
     {
-        "timestamp": "08/Mar/2026 07:03:14",
+        "timestamp": "08/Mar/2026 15:14:26",
         "client": "127.0.0.1",
-        "message": "\"GET / HTTP/1.1\" 200 -"
+        "message": "\"GET /api/return-points HTTP/1.1\" 404 -"
     },
     {
-        "timestamp": "08/Mar/2026 07:03:15",
+        "timestamp": "08/Mar/2026 15:14:26",
         "client": "127.0.0.1",
-        "message": "code 404, message File not found"
+        "message": "code 404, message Endpoint not found"
     },
     {
-        "timestamp": "08/Mar/2026 07:03:15",
+        "timestamp": "08/Mar/2026 15:14:26",
         "client": "127.0.0.1",
-        "message": "\"GET /favicon.ico HTTP/1.1\" 404 -"
+        "message": "\"GET /api/snapshots HTTP/1.1\" 404 -"
     },
     {
-        "timestamp": "08/Mar/2026 07:04:25",
+        "timestamp": "08/Mar/2026 15:14:26",
         "client": "127.0.0.1",
-        "message": "\"GET / HTTP/1.1\" 304 -"
+        "message": "\"GET /api/memory HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 07:12:54",
+        "timestamp": "08/Mar/2026 15:14:26",
         "client": "127.0.0.1",
-        "message": "code 404, message File not found"
+        "message": "code 404, message Endpoint not found"
     },
     {
-        "timestamp": "08/Mar/2026 07:12:54",
+        "timestamp": "08/Mar/2026 15:14:26",
         "client": "127.0.0.1",
-        "message": "\"GET /favicon.ico HTTP/1.1\" 404 -"
+        "message": "\"GET /api/training HTTP/1.1\" 404 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:26",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/sysinfo HTTP/1.1\" 200 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:26",
+        "client": "127.0.0.1",
+        "message": "code 404, message Endpoint not found"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:26",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/system-prompt HTTP/1.1\" 404 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:28",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/logs HTTP/1.1\" 200 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:28",
+        "client": "127.0.0.1",
+        "message": "code 404, message Endpoint not found"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:28",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/return-points HTTP/1.1\" 404 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:28",
+        "client": "127.0.0.1",
+        "message": "code 404, message Endpoint not found"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:28",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/snapshots HTTP/1.1\" 404 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:28",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/memory HTTP/1.1\" 200 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:28",
+        "client": "127.0.0.1",
+        "message": "code 404, message Endpoint not found"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:28",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/training HTTP/1.1\" 404 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:28",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/sysinfo HTTP/1.1\" 200 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:28",
+        "client": "127.0.0.1",
+        "message": "code 404, message Endpoint not found"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:14:28",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/system-prompt HTTP/1.1\" 404 -"
     }
 ]
