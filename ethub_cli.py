@@ -1,153 +1,176 @@
 #!/usr/bin/env python3
-import sys
-import os
-import argparse
 import json
-from datetime import datetime
+import urllib.request
+import urllib.parse
+import urllib.error
+import argparse
+import sys
+import re
+from html.parser import HTMLParser
 
-from ui.rainbow_animation import run_intro
-from core.reasoning_engine import ReasoningEngine
-from core.action_engine import ActionEngine
-from core.approval_engine import ApprovalEngine
-from core.safety_engine import SafetyEngine
-from core.search_engine import SearchEngine
-from core.snapshot_engine import SnapshotEngine
-from core.patch_engine import PatchEngine
+OLLAMA_URL = "http://127.0.0.1:11434/api/pull"
+MODEL = "qwen2.5:0.5b"
 
-# --- Constants ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-INITIAL_DIR = os.path.abspath(BASE_DIR)
-DATA_DIR = os.path.join(BASE_DIR, "agent-data")
-HISTORY_JSON = os.path.join(DATA_DIR, "history.json")
+SYSTEM_PROMPT = """You are an autonomous AI agent with web search capabilities.
+You run in a terminal and must help the user by finding information on the web.
+You have access to the following tools:
+1. "web_search": Searches the internet. Requires argument "query".
+2. "fetch_url": Fetches text content from a specific URL. Requires argument "url".
+3. "final_answer": Provides the final response to the user. Requires argument "text".
 
-def ensure_dirs():
-    dirs = [DATA_DIR, os.path.join(BASE_DIR, "rules"), os.path.join(BASE_DIR, "ui")]
-    for d in dirs:
-        if not os.path.exists(d):
-            os.makedirs(d, exist_ok=True)
+You must ALWAYS respond with ONLY a valid JSON object in the following format:
+{
+  "thought": "your reasoning about what to do next",
+  "action": "tool_name",
+  "args": {"arg_name": "arg_value"}
+}
+Do not include any extra text outside the JSON object.
+"""
 
-def load_json(file_path, default_type=dict):
-    if not os.path.exists(file_path): return default_type()
+class MLStripper(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.reset()
+        self.strict = False
+        self.convert_charrefs= True
+        self.text = []
+    def handle_data(self, d):
+        self.text.append(d)
+    def get_data(self):
+        return ''.join(self.text)
+
+def strip_tags(html):
+    s = MLStripper()
+    s.feed(html)
+    return s.get_data()
+
+def web_search(query):
+    url = 'https://lite.duckduckgo.com/lite/'
+    data = urllib.parse.urlencode({'q': query}).encode('utf-8')
+    req = urllib.request.Request(url, data=data, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
     try:
-        with open(file_path, "r") as f: return json.load(f)
-    except: return default_type()
+        with urllib.request.urlopen(req) as response:
+            html = response.read().decode('utf-8')
+            snippets = re.findall(r'<td class="result-snippet"[^>]*>(.*?)</td>', html, re.IGNORECASE | re.DOTALL)
+            links = re.findall(r'<a class="result-url" href="([^"]+)">', html, re.IGNORECASE)
+            
+            results = []
+            for i in range(min(5, len(snippets), len(links))):
+                text = strip_tags(snippets[i]).strip()
+                results.append(f"Result {i+1}: {text}\nURL: {links[i]}")
+            
+            return "\n\n".join(results) if results else "No results found."
+    except Exception as e:
+        return f"Search failed: {e}"
 
-def save_json(file_path, data):
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    with open(file_path, "w") as f: json.dump(data, f, indent=4)
+def fetch_url(url):
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+        with urllib.request.urlopen(req) as response:
+            html = response.read().decode('utf-8')
+            body_match = re.search(r'<body[^>]*>(.*?)</body>', html, re.IGNORECASE | re.DOTALL)
+            if body_match:
+                html = body_match.group(1)
+            html = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.IGNORECASE | re.DOTALL)
+            html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.IGNORECASE | re.DOTALL)
+            text = strip_tags(html)
+            text = re.sub(r'\s+', ' ', text)
+            return text[:3000]
+    except Exception as e:
+        return f"Fetch failed: {e}"
 
-def log_history(query, reasoning, actions, approved, safe):
-    history = load_json(HISTORY_JSON, list)
-    history.append({
-        "timestamp": datetime.now().isoformat(),
-        "query": query,
-        "reasoning": reasoning,
-        "actions": actions,
-        "approved": approved,
-        "safe": safe
-    })
-    if len(history) > 100: history.pop(0)
-    save_json(HISTORY_JSON, history)
+def chat_with_ollama(messages):
+    data = {
+        "model": MODEL,
+        "messages": messages,
+        "stream": False,
+        "format": "json"
+    }
+    try:
+        req = urllib.request.Request(OLLAMA_URL, data=json.dumps(data).encode('utf-8'), headers={'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req) as response:
+            res = json.loads(response.read().decode('utf-8'))
+            return res['message']['content']
+    except urllib.error.URLError as e:
+        return json.dumps({"action": "final_answer", "args": {"text": f"Error communicating with Ollama server at {OLLAMA_URL}. Is it running? Details: {e}"}})
+    except Exception as e:
+        return json.dumps({"action": "final_answer", "args": {"text": f"Error communicating with Ollama: {e}"}})
+
+def run_agent_loop(messages):
+    print("\n\x1b[35mAgent is thinking...\x1b[0m")
+    steps = 0
+    max_steps = 10
+    
+    while steps < max_steps:
+        response_text = chat_with_ollama(messages)
+        messages.append({"role": "assistant", "content": response_text})
+        
+        try:
+            response_json = json.loads(response_text)
+            thought = response_json.get("thought", "")
+            action = response_json.get("action", "")
+            args = response_json.get("args", {})
+            
+            if thought:
+                print(f"\x1b[90mThought: {thought}\x1b[0m")
+                
+            if action == "final_answer":
+                print(f"\n\x1b[36mAgent:\x1b[0m {args.get('text', '')}")
+                break
+            elif action == "web_search":
+                query = args.get('query', '')
+                print(f"\x1b[33m[*] Searching the web for: {query}\x1b[0m")
+                result = web_search(query)
+                messages.append({"role": "user", "content": f"Search Results for '{query}':\n{result}"})
+            elif action == "fetch_url":
+                url = args.get('url', '')
+                print(f"\x1b[33m[*] Fetching URL: {url}\x1b[0m")
+                result = fetch_url(url)
+                messages.append({"role": "user", "content": f"Content of {url}:\n{result}"})
+            else:
+                messages.append({"role": "user", "content": f"Unknown action: {action}. Please use web_search, fetch_url, or final_answer."})
+        except json.JSONDecodeError:
+            print("\x1b[31mError: Agent did not return valid JSON. Retrying...\x1b[0m")
+            messages.append({"role": "user", "content": "Your previous response was not valid JSON. You MUST return ONLY a JSON object."})
+            
+        steps += 1
+        
+    if steps >= max_steps:
+        print("\n\x1b[31mAgent reached maximum steps and stopped.\x1b[0m")
 
 def main():
-    ensure_dirs()
+    parser = argparse.ArgumentParser(description="ETHUB CLI - Isolated Terminal Agent")
+    parser.add_argument("query", nargs="?", help="The question or task for the agent")
+    parser.add_argument("--interactive", "-i", action="store_true", help="Start interactive mode")
     
-    parser = argparse.ArgumentParser(description="ETHUB CLI - Secure Isolated Search Agent")
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
-
-    # search command
-    search_parser = subparsers.add_parser("search", help="Perform a secure smart search.")
-    search_parser.add_argument("query", help="The search query.")
-
-    # rollback command
-    rollback_parser = subparsers.add_parser("rollback", help="Roll back to previous snapshot.")
-    rollback_parser.add_argument("--steps", type=int, default=1, help="Steps to rollback.")
-
-    if len(sys.argv) == 1:
-        run_intro(INITIAL_DIR)
-        parser.print_help()
-        print("\n\x1b[90mTip: Double-tap Tab (simulated) for history screen. Use 'rollback --steps N' to undo changes.\x1b[0m")
-        return
-
     args = parser.parse_args()
-
-    # Snapshot Engine (Always active)
-    snapshot_engine = SnapshotEngine(data_dir=DATA_DIR)
     
-    if args.command == "rollback":
-        success, msg = snapshot_engine.rollback(args.steps)
-        print(f"\x1b[32m{msg}\x1b[0m" if success else f"\x1b[31m{msg}\x1b[0m")
-        return
-
-    if args.command == "search":
-        query = args.query
-        
-        # 0. Snapshot Current State
-        snapshot_id = snapshot_engine.create_snapshot(query)
-        print(f"\x1b[90mSnapshot created: {snapshot_id}\x1b[0m")
-
-        # 1. Query Router & Reasoning
-        reasoning_engine = ReasoningEngine()
-        reasoning = reasoning_engine.analyze(query)
-        print(f"\x1b[38;5;81mClassified as: {reasoning['query_type'].upper()}\x1b[0m")
-        
-        # 2. Action Stage
-        action_engine = ActionEngine()
-        actions = action_engine.decide_actions(reasoning)
-        actions["query"] = query
-        
-        # 3. Security Audit (Initial Query Audit)
-        safety_engine = SafetyEngine()
-        is_safe, risks = safety_engine.audit_source_chunk(query, "user_input", query)
-        if not is_safe:
-            print("\x1b[31mQuery denied by Security Audit!\x1b[0m")
-            for risk in risks: print(f"Risk: {risk}")
-            log_history(query, reasoning, actions, False, False)
-            return
-
-        # 4. Approval Gate
-        approval_engine = ApprovalEngine(approvals_file=os.path.join(DATA_DIR, "approvals.json"))
-        if not approval_engine.ask(actions):
-            print("\x1b[31mAction cancelled by user.\x1b[0m")
-            log_history(query, reasoning, actions, False, True)
-            return
-
-        # 5. Source Fetcher & Execution (with Chunk Auditing)
-        search_engine = SearchEngine(results_file=os.path.join(DATA_DIR, "results.json"))
-        sources = actions.get("sources", [])
-        
-        results = []
-        for engine_name in sources:
-            url = search_engine._get_url(engine_name, query)
-            if url:
-                print(f"Fetching chunk from {engine_name}...")
-                # Simulated chunk for audit (In real implementation, fetch content here)
-                simulated_chunk = f"Results for {query} from {engine_name}..."
-                
-                safe_chunk, chunk_risks = safety_engine.audit_source_chunk(query, url, simulated_chunk)
-                if not safe_chunk:
-                    print(f"\x1b[31mBlocked untrusted content from {url}\x1b[0m")
-                    continue
-                
-                print(f"Searching {engine_name} for: {query}")
-                import webbrowser
-                webbrowser.open(url)
-                results.append({"engine": engine_name, "url": url})
-        
-        search_engine._store_results(query, results)
-        
-        # 6. Patch Generator (Simulated example of patch workflow)
-        if reasoning["query_type"] == "code_query":
-            patch_engine = PatchEngine(safety_engine)
-            # Example: Suggesting a small fix in history.json logic (simulated)
-            # In a real scenario, this would come from the agent's logic.
-            print("\x1b[38;5;214mSafe Patch Generated (Review in agent-data/snippets.json)\x1b[0m")
-
-        log_history(query, reasoning, actions, True, True)
-        print("\x1b[32mProcess complete. Logs saved in agent-data/\x1b[0m")
-
-    else:
+    if not args.query and not args.interactive:
         parser.print_help()
+        sys.exit(1)
+        
+    print(f"\x1b[36mETHUB CLI Agent initialized. Model: {MODEL}\x1b[0m")
+    
+    if args.interactive:
+        print("Interactive mode started. Type 'exit' to quit.")
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        while True:
+            try:
+                user_input = input("\n\x1b[32mYou:\x1b[0m ")
+                if user_input.lower() in ['exit', 'quit']:
+                    break
+                if not user_input.strip():
+                    continue
+                messages.append({"role": "user", "content": user_input})
+                run_agent_loop(messages)
+            except (KeyboardInterrupt, EOFError):
+                break
+    else:
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": args.query}
+        ]
+        run_agent_loop(messages)
 
 if __name__ == "__main__":
     main()

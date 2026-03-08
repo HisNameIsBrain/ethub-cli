@@ -1,38 +1,54 @@
 import json
+import ollama
 
 class ReasoningEngine:
-    def __init__(self):
-        self.code_keywords = ["fix", "code", "syntax", "error", "bug", "implement", "function", "class", "npm", "pip", "git", "react", "python", "node"]
-        self.info_keywords = ["what is", "how to", "why", "who", "when", "tell me about", "define", "meaning"]
+    def __init__(self, model="qwen2.5:0.5b"):
+        self.model = model
 
     def analyze(self, query):
-        """Analyze query and classify as Code Query or Information Query."""
-        query_lower = query.lower()
-        
-        # Classification
-        is_code = any(word in query_lower for word in self.code_keywords)
-        is_info = any(word in query_lower for word in self.info_keywords)
-        
-        # If both or neither, check for specific code indicators like file extensions or CamelCase/snake_case
-        if (is_code and is_info) or (not is_code and not is_info):
-            if any(ext in query_lower for ext in [".py", ".js", ".html", ".css", ".ts", ".json"]):
-                query_type = "code_query"
-            else:
-                query_type = "info_query"
-        elif is_code:
-            query_type = "code_query"
-        else:
-            query_type = "info_query"
-
-        intent = "debugging" if "error" in query_lower or "fix" in query_lower else "general_request"
-        keywords = [word for word in query_lower.split() if len(word) > 3]
-        
-        reasoning = {
-            "query": query,
-            "query_type": query_type,
-            "intent": intent,
-            "keywords": keywords,
-            "search_strategy": "URL-only source fetching"
-        }
-        
-        return reasoning
+        """Uses local Ollama to classify the intent of the ETHUB request."""
+        try:
+            # System prompt ensures the model acts as part of the ETHUB core
+            response = ollama.chat(model=self.model, messages=[
+                {
+                    'role': 'system', 
+                    'content': 'You are the ETHUB Reasoning Engine. Classify queries into: code_query, hardware_query, or general_query. Reply ONLY with a JSON object: {"query_type": "type", "intent": "intent", "keywords": ["kw1", "kw2"]}'
+                },
+                {'role': 'user', 'content': query}
+            ])
+            
+            # Cleanly parse the model's JSON response
+            raw_content = response['message']['content']
+            
+            # Attempt to parse JSON from the response
+            try:
+                # Basic cleanup if model adds markdown formatting
+                if "```json" in raw_content:
+                    raw_content = raw_content.split("```json")[1].split("```")[0].strip()
+                elif "```" in raw_content:
+                    raw_content = raw_content.split("```")[1].split("```")[0].strip()
+                
+                reasoning = json.loads(raw_content)
+            except:
+                # Fallback classification logic
+                q_type = "code_query" if any(x in raw_content.lower() for x in ["code", "debug", "error"]) else "general_query"
+                if "hardware" in raw_content.lower(): q_type = "hardware_query"
+                reasoning = {
+                    "query_type": q_type,
+                    "intent": "general_request",
+                    "keywords": [word for word in query.lower().split() if len(word) > 3]
+                }
+            
+            reasoning["query"] = query
+            reasoning["search_strategy"] = "LLM-driven URL source fetching"
+            return reasoning
+            
+        except Exception as e:
+            # Complete safety fallback
+            return {
+                "query": query,
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": str(e)
+            }
