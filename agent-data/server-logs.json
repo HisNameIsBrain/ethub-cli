@@ -1,502 +1,252 @@
 [
     {
-        "timestamp": "08/Mar/2026 08:32:46",
+        "timestamp": "08/Mar/2026 15:39:13",
         "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
+        "message": "\"GET /api/sysinfo HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:46",
+        "timestamp": "08/Mar/2026 15:39:13",
         "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
+        "message": "\"GET /api/system-prompt HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:46",
-        "client": "127.0.0.1",
-        "message": "code 404, message File not found"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:32:47",
-        "client": "127.0.0.1",
-        "message": "\"GET /favicon.ico HTTP/1.1\" 404 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:32:48",
+        "timestamp": "08/Mar/2026 15:39:15",
         "client": "127.0.0.1",
         "message": "\"GET /api/logs HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:48",
+        "timestamp": "08/Mar/2026 15:39:15",
         "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
+        "message": "\"GET /api/return-points HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:48",
+        "timestamp": "08/Mar/2026 15:39:15",
         "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
+        "message": "\"GET /api/snapshots HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:48",
+        "timestamp": "08/Mar/2026 15:39:15",
         "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
+        "message": "\"GET /api/memory HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:50",
+        "timestamp": "08/Mar/2026 15:39:15",
         "client": "127.0.0.1",
-        "message": "\"GET /api/logs HTTP/1.1\" 200 -"
+        "message": "code 404, message Endpoint not found"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:50",
+        "timestamp": "08/Mar/2026 15:39:15",
         "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
+        "message": "\"GET /api/training HTTP/1.1\" 404 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:50",
+        "timestamp": "08/Mar/2026 15:39:15",
         "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
+        "message": "\"GET /api/sysinfo HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:50",
+        "timestamp": "08/Mar/2026 15:39:15",
         "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
+        "message": "\"GET /api/system-prompt HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:52",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/logs HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:32:52",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:32:52",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:32:52",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:32:54",
+        "timestamp": "08/Mar/2026 15:39:18",
         "client": "127.0.0.1",
         "message": "\"GET /api/logs HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:54",
+        "timestamp": "08/Mar/2026 15:39:18",
         "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
+        "message": "\"GET /api/return-points HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:54",
+        "timestamp": "08/Mar/2026 15:39:18",
         "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
+        "message": "\"GET /api/snapshots HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:54",
+        "timestamp": "08/Mar/2026 15:39:18",
         "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
+        "message": "\"GET /api/memory HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:56",
+        "timestamp": "08/Mar/2026 15:39:18",
         "client": "127.0.0.1",
-        "message": "\"GET /api/logs HTTP/1.1\" 200 -"
+        "message": "code 404, message Endpoint not found"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:56",
+        "timestamp": "08/Mar/2026 15:39:18",
         "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
+        "message": "\"GET /api/training HTTP/1.1\" 404 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:56",
+        "timestamp": "08/Mar/2026 15:39:18",
         "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
+        "message": "\"GET /api/sysinfo HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:56",
+        "timestamp": "08/Mar/2026 15:39:18",
         "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
+        "message": "\"GET /api/system-prompt HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:32:58",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/logs HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:32:58",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:32:58",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:32:58",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:00",
+        "timestamp": "08/Mar/2026 15:39:20",
         "client": "127.0.0.1",
         "message": "\"GET /api/logs HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:00",
+        "timestamp": "08/Mar/2026 15:39:20",
         "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
+        "message": "\"GET /api/return-points HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:00",
+        "timestamp": "08/Mar/2026 15:39:20",
         "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
+        "message": "\"GET /api/snapshots HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:00",
+        "timestamp": "08/Mar/2026 15:39:20",
         "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
+        "message": "\"GET /api/memory HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:02",
+        "timestamp": "08/Mar/2026 15:39:20",
         "client": "127.0.0.1",
-        "message": "\"GET /api/logs HTTP/1.1\" 200 -"
+        "message": "code 404, message Endpoint not found"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:02",
+        "timestamp": "08/Mar/2026 15:39:20",
         "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
+        "message": "\"GET /api/training HTTP/1.1\" 404 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:02",
+        "timestamp": "08/Mar/2026 15:39:20",
         "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
+        "message": "\"GET /api/sysinfo HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:02",
+        "timestamp": "08/Mar/2026 15:39:20",
         "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
+        "message": "\"GET /api/system-prompt HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:04",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/logs HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:04",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:04",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:04",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:06",
+        "timestamp": "08/Mar/2026 15:39:23",
         "client": "127.0.0.1",
         "message": "\"GET /api/logs HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:06",
+        "timestamp": "08/Mar/2026 15:39:23",
         "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
+        "message": "\"GET /api/return-points HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:06",
+        "timestamp": "08/Mar/2026 15:39:23",
         "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
+        "message": "\"GET /api/snapshots HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:06",
+        "timestamp": "08/Mar/2026 15:39:23",
         "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
+        "message": "\"GET /api/memory HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:08",
+        "timestamp": "08/Mar/2026 15:39:23",
+        "client": "127.0.0.1",
+        "message": "code 404, message Endpoint not found"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:39:23",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/training HTTP/1.1\" 404 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:39:23",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/sysinfo HTTP/1.1\" 200 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:39:23",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/system-prompt HTTP/1.1\" 200 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:39:25",
         "client": "127.0.0.1",
         "message": "\"GET /api/logs HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:08",
+        "timestamp": "08/Mar/2026 15:39:25",
         "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
+        "message": "\"GET /api/return-points HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:08",
+        "timestamp": "08/Mar/2026 15:39:25",
         "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
+        "message": "\"GET /api/snapshots HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:08",
+        "timestamp": "08/Mar/2026 15:39:25",
         "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
+        "message": "\"GET /api/memory HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:09",
+        "timestamp": "08/Mar/2026 15:39:25",
         "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
+        "message": "code 404, message Endpoint not found"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:10",
+        "timestamp": "08/Mar/2026 15:39:25",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/training HTTP/1.1\" 404 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:39:25",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/sysinfo HTTP/1.1\" 200 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:39:25",
+        "client": "127.0.0.1",
+        "message": "\"GET /api/system-prompt HTTP/1.1\" 200 -"
+    },
+    {
+        "timestamp": "08/Mar/2026 15:39:28",
         "client": "127.0.0.1",
         "message": "\"GET /api/logs HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:10",
+        "timestamp": "08/Mar/2026 15:39:28",
         "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
+        "message": "\"GET /api/return-points HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:10",
+        "timestamp": "08/Mar/2026 15:39:28",
         "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
+        "message": "\"GET /api/snapshots HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:10",
+        "timestamp": "08/Mar/2026 15:39:28",
         "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
+        "message": "\"GET /api/memory HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:10",
+        "timestamp": "08/Mar/2026 15:39:28",
         "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
+        "message": "code 404, message Endpoint not found"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:12",
+        "timestamp": "08/Mar/2026 15:39:28",
         "client": "127.0.0.1",
-        "message": "\"GET /api/logs HTTP/1.1\" 200 -"
+        "message": "\"GET /api/training HTTP/1.1\" 404 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:12",
+        "timestamp": "08/Mar/2026 15:39:28",
         "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
+        "message": "\"GET /api/sysinfo HTTP/1.1\" 200 -"
     },
     {
-        "timestamp": "08/Mar/2026 08:33:12",
+        "timestamp": "08/Mar/2026 15:39:28",
         "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:12",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:12",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:12",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:14",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/logs HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:14",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:14",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:14",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:14",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:16",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/logs HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:16",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:16",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:16",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:16",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:18",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/logs HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:18",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:18",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:18",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:18",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:20",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/logs HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:20",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:20",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:20",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:20",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:22",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/logs HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:22",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:22",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:22",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:22",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:24",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/logs HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:24",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:24",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:24",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:24",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:26",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/logs HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:26",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:26",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:26",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:26",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:28",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/logs HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:28",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/cli-console HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:28",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:28",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/risks HTTP/1.1\" 200 -"
-    },
-    {
-        "timestamp": "08/Mar/2026 08:33:28",
-        "client": "127.0.0.1",
-        "message": "\"GET /api/settings HTTP/1.1\" 200 -"
+        "message": "\"GET /api/system-prompt HTTP/1.1\" 200 -"
     }
 ]

@@ -92,3 +92,24 @@ class SafetyEngine:
             
         with open(self.risks_file, "w") as f:
             json.dump(history, f, indent=4)
+
+    def perform_surgical_audit(self, fix_cmds, diff_patch):
+        """[FIELD: SURGICAL_AUDIT] - Audit a proposed fix for risky patterns."""
+        risks = []
+        combined = f"{fix_cmds}\n{diff_patch}"
+        
+        # Check for absolute path deletions
+        if re.search(r'rm\s+-rf\s+/', combined):
+            risks.append("CRITICAL: Root directory deletion detected.")
+        
+        # Check for system file access
+        if any(x in combined for x in ["/etc/shadow", "/etc/passwd", ".ssh/"]):
+            risks.append("HIGH: Attempt to access sensitive system files.")
+            
+        # Check for curl | bash
+        if re.search(r'curl\s+.*\s*\|\s*bash', combined):
+            risks.append("MEDIUM: Potential unsafe remote script execution.")
+
+        if not risks:
+            return True, "No critical risks detected. Patch is surgically sound."
+        return False, "; ".join(risks)

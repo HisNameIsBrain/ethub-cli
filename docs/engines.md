@@ -1,48 +1,45 @@
-# ETHUB Core Engines Documentation
+# ETHUB Core Engines Documentation (Surgical & Return v2.1)
 
-The ETHUB CLI delegates logic to highly specialized module engines within the `core/` directory. This modular approach allows for robust testing, straightforward extensibility, and maintainability.
+The ETHUB-CLI delegates logic to highly specialized module engines within the `core/` directory. This modular approach ensures **Isolation**, **Integrity**, and **Security**.
 
-## 1. Action Engine (`action_engine.py`)
-- **Responsibility:** Determines the most effective web search strategy.
-- **Mechanism:** Uses a local LLM prompt via Ollama to map a derived reasoning intent to specific online sources (e.g., GitHub, StackOverflow, Dev.to). Includes an offline fallback.
+## 1. Surgical Action Engine (`surgical_engine.py`)
+- **Responsibility:** Executes surgical directory-level operations (list, read, patch).
+- **Mechanism**:
+    - **Integrity**: Every file action includes a mandatory SHA256 integrity check using `hashlib`.
+    - **Snapshot Protocol**: Automatically creates `.bak` backups in `.ethub/snapshots/` before any write operation.
+    - **Isolation**: Strictly enforces path-awareness, restricting all actions to the current project root.
+    - **Sanitization**: Thoroughly strips `<script>` and `<style>` tags from all incoming web content.
 
-## 2. Approval Engine (`approval_engine.py`)
-- **Responsibility:** Serves as a manual security gate.
-- **Mechanism:** Prompts the user interactively before high-impact operations are executed. Logs all approvals and denials persistently in `approvals.json` for auditing.
+## 2. Return & Recovery Engine (`return_engine.py`)
+- **Responsibility**: Manages unified system restoration and rollback.
+- **Mechanism**:
+    - **Capture Point**: Creates a point-in-time manifest of all agent-data (history, memory, etc.) and links them to specific SHA256 hashes.
+    - **Restore**: Restores the entire agent state to a previous Point ID from `.ethub/history/`.
+    - **Rollback**: Specifically reverts individual surgical fixes using the `.bak` snapshot system.
 
-## 3. Config Engine (`config_engine.py`)
-- **Responsibility:** Manages global state and application preferences.
-- **Mechanism:** Maintains defaults (like `timeout`, `model`, `ollama_url`) and syncs updates to `agent-data/config.json`. Exposes `get()` and `set()` APIs for dynamic runtime configuration.
+## 3. Reasoning Engine (`reasoning_engine.py`)
+- **Responsibility**: Classifies and analyzes user request intent for the Hybrid Pipeline.
+- **Mechanism**: Uses a local LLM to classify queries into specialized categories: `surgical_fix`, `return_recovery`, `code_query`, `hardware_query`, or `general_query`.
 
-## 4. Helper Engine (`helper_engine.py`)
-- **Responsibility:** Handles formatting, terminal UI, and system queries.
-- **Mechanism:** Provides methods for colored console output, formatted UI boxes, terminal clearing, and accessing OS-level details (`sysinfo`).
+## 4. Safety Engine (`safety_engine.py`)
+- **Responsibility**: Serves as a 9-point security firewall.
+- **Mechanism**: 
+    - **Surgical Audit**: Dedicated method to audit proposed `FIX_CMDS` and `DIFF_PATCH` for dangerous patterns (e.g., `rm -rf /`, `/etc/shadow`).
+    - **Standard Audits**: Checks domain validity, prompt injection, and file traversal attempts.
+    - Logs all blocked operations in `agent-data/dependabot-risks.json`.
 
-## 5. Patch Engine (`patch_engine.py`)
-- **Responsibility:** Generates and safely applies code diffs.
-- **Mechanism:** Integrates `difflib` to produce unified diffs between old and new code states. Runs generated patches through the `SafetyEngine` before giving the green light for `apply_patch` to execute file I/O.
+## 5. Hybrid Engine (`hybrid_engine.py`)
+- **Responsibility**: Orchestrates the "Reason -> Knowledge -> Action" pipeline.
+- **Mechanism**: Combines local training data (RAG) with real-time intent analysis and the **Return Engine** to suggest the safest and most accurate actions.
 
-## 6. Reasoning Engine (`reasoning_engine.py`)
-- **Responsibility:** Classifies and deeply analyzes user requests.
-- **Mechanism:** Forwards the raw user query to Ollama to classify it as a `code_query`, `hardware_query`, or `general_query`, extracting intents and keywords to inform downstream routing.
+## 6. Config Engine (`config_engine.py`)
+- **Responsibility**: Manages engine parameters and application preferences.
+- **Mechanism**: Synchronizes updates to `agent-data/config.json`, including search engines, timeouts, and model selection.
 
-## 7. Safety Engine (`safety_engine.py`)
-- **Responsibility:** Serves as an aggressive 8-point security firewall.
-- **Mechanism:** Checks inbound and outbound operations against specific rules, such as:
-  1. Validating source domains.
-  2. Inspecting HTML for hidden scripts.
-  3. Denying dangerous Python commands (e.g., `exec`, `eval`).
-  4. Detecting prompt injection attempts.
-  5. Monitoring for environment or secret-key harvesting.
-  6. Enforcing safe package manager source requests.
-  7. Flagging unsafe shell piping.
-  8. Checking for file traversal attacks (`../`, `/etc/passwd`).
-  Logs blocked operations into `agent-data/dependabot-risks.json`.
+## 7. Helper Engine (`helper_engine.py`)
+- **Responsibility**: Provides terminal UI formatting and system queries.
+- **Mechanism**: Exposes `sysinfo` for hardware details and `format_box` for high-density console output.
 
-## 8. Search Engine (`search_engine.py`)
-- **Responsibility:** Orchestrates web-browser-based searches and logs history.
-- **Mechanism:** Maps platform targets (Google, GitHub, Wiki) to specific search URL schemas, opens default browsers, and keeps an audit trail in `results.json`.
-
-## 9. Snapshot Engine (`snapshot_engine.py`)
-- **Responsibility:** Manages state history and safe reversions.
-- **Mechanism:** Creates full-directory snapshots of all `.json` files in `agent-data` before major operations. Exposes a `rollback` mechanism to revert back to a previous state, preventing catastrophic data loss.
+## 8. Web Server (`web_server.py`)
+- **Responsibility**: Hosts the **Surgical Management Dashboard**.
+- **Mechanism**: Provides an ARIA-compliant REST API for live console preview, engine deep-dive insights, and manual system actions (Capture, Restore, Rollback).

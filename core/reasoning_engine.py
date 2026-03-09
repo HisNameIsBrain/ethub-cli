@@ -16,7 +16,7 @@ class ReasoningEngine:
                 "messages": [
                     {
                         'role': 'system', 
-                        'content': 'You are the ETHUB Reasoning Engine. Classify queries into: code_query, hardware_query, or general_query. Reply ONLY with a JSON object: {"query_type": "type", "intent": "intent", "keywords": ["kw1", "kw2"]}'
+                        'content': 'You are the ETHUB Reasoning Engine. Classify queries into: surgical_fix, return_recovery, code_query, hardware_query, or general_query. Reply ONLY with a JSON object: {"query_type": "type", "intent": "intent", "keywords": ["kw1", "kw2"]}'
                     },
                     {'role': 'user', 'content': query}
                 ],

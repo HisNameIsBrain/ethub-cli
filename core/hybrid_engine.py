@@ -4,7 +4,7 @@ import re
 from core.reasoning_engine import ReasoningEngine
 from core.action_engine import ActionEngine
 from core.safety_engine import SafetyEngine
-from core.snapshot_engine import SnapshotEngine
+from core.return_engine import EthubReturnEngine
 from core.config_engine import ConfigEngine
 
 class HybridEngine:
@@ -17,7 +17,7 @@ class HybridEngine:
         self.reasoner = ReasoningEngine(model=model, ollama_url=ollama_url, timeout=timeout)
         self.actor = ActionEngine(model=model, ollama_url=ollama_url, timeout=timeout)
         self.safety = SafetyEngine()
-        self.snapshot = SnapshotEngine()
+        self.return_engine = EthubReturnEngine()
         self.training_file = "agent-data/training.json"
 
     def get_local_knowledge(self, query, top_k=3):
@@ -60,5 +60,11 @@ class HybridEngine:
         # 3. Action Planning
         print("\x1b[90m[Hybris] Planning search strategy...\x1b[0m")
         actions = self.actor.decide_actions(reasoning)
+        
+        # 4. Direct Answer Heuristic
+        if reasoning.get("query_type") == "general_query" and local_info:
+             print("\x1b[90m[Hybris] Simple question detected. Suggesting direct answer.\x1b[0m")
+             actions["action"] = "final_answer"
+             actions["direct_suggest"] = True
         
         return reasoning, actions
