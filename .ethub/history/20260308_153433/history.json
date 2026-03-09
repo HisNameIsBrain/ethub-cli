@@ -103,10 +103,5 @@
         "timestamp": "2026-03-08 07:10:54",
         "query": "prevent dashboard from ddos",
         "snapshot_id": "20260308_071054_846171"
-    },
-    {
-        "timestamp": "2026-03-08 15:34:33",
-        "query": "cat README.md",
-        "return_id": "20260308_153433"
     }
 ]

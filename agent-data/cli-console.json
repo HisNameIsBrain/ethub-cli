@@ -1,41 +1,5 @@
 [
     {
-        "timestamp": "2026-03-08 05:39:29",
-        "text": "\u001b[36m[INFO]\u001b[0m ETHUB CLI Agent initialized. Model: qwen2.5:0.5b"
-    },
-    {
-        "timestamp": "2026-03-08 05:39:29",
-        "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
-    },
-    {
-        "timestamp": "2026-03-08 05:42:24",
-        "text": "\u001b[36m[INFO]\u001b[0m ETHUB CLI Agent initialized. Model: qwen2.5:0.5b"
-    },
-    {
-        "timestamp": "2026-03-08 05:42:25",
-        "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
-    },
-    {
-        "timestamp": "2026-03-08 05:42:48",
-        "text": "\u001b[36m[INFO]\u001b[0m Ollama Commands: /ollama pull [model]"
-    },
-    {
-        "timestamp": "2026-03-08 05:42:51",
-        "text": "\u001b[36m[INFO]\u001b[0m Ollama Commands: /ollama pull [model]"
-    },
-    {
-        "timestamp": "2026-03-08 05:44:08",
-        "text": "\u001b[36m[INFO]\u001b[0m Searching for: q What other helpers could a web search agent have"
-    },
-    {
-        "timestamp": "2026-03-08 05:44:47",
-        "text": "\u001b[36m[INFO]\u001b[0m Agent is thinking..."
-    },
-    {
-        "timestamp": "2026-03-08 05:44:47",
-        "text": "\u001b[36m[INFO]\u001b[0m Snapshot created: 20260308_054447_531142"
-    },
-    {
         "timestamp": "2026-03-08 05:44:57",
         "text": "Agent: Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
     },
@@ -154,5 +118,85 @@
     {
         "timestamp": "2026-03-08 15:15:54",
         "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
+    },
+    {
+        "timestamp": "2026-03-08 15:24:11",
+        "text": "\u001b[36m[INFO]\u001b[0m ETHUB CLI Agent initialized. Model: qwen2.5:0.5b"
+    },
+    {
+        "timestamp": "2026-03-08 15:24:11",
+        "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
+    },
+    {
+        "timestamp": "2026-03-08 15:24:17",
+        "text": "\u001b[36m[INFO]\u001b[0m ETHUB CLI Agent initialized. Model: qwen2.5:0.5b"
+    },
+    {
+        "timestamp": "2026-03-08 15:24:17",
+        "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
+    },
+    {
+        "timestamp": "2026-03-08 15:24:41",
+        "text": "\u001b[36m[INFO]\u001b[0m Ollama Commands: /ollama pull [model]"
+    },
+    {
+        "timestamp": "2026-03-08 15:25:33",
+        "text": "\u001b[36m[INFO]\u001b[0m Searching for: surgical fix in ethub docs"
+    },
+    {
+        "timestamp": "2026-03-08 15:33:10",
+        "text": "\u001b[36m[INFO]\u001b[0m ETHUB CLI Agent initialized. Model: qwen2.5:0.5b"
+    },
+    {
+        "timestamp": "2026-03-08 15:33:10",
+        "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
+    },
+    {
+        "timestamp": "2026-03-08 15:33:17",
+        "text": "\u001b[31m[ERROR]\u001b[0m Unknown command: /helo"
+    },
+    {
+        "timestamp": "2026-03-08 15:34:33",
+        "text": "\u001b[36m[INFO]\u001b[0m Agent is thinking..."
+    },
+    {
+        "timestamp": "2026-03-08 15:34:33",
+        "text": "\u001b[36m[INFO]\u001b[0m Return point captured: 20260308_153433"
+    },
+    {
+        "timestamp": "2026-03-08 15:34:33",
+        "text": "Agent: Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: <urlopen error [Errno 111] Connection refused>"
+    },
+    {
+        "timestamp": "2026-03-08 15:52:30",
+        "text": "\u001b[36m[INFO]\u001b[0m ETHUB CLI Agent initialized. Model: qwen2.5:0.5b"
+    },
+    {
+        "timestamp": "2026-03-08 15:52:30",
+        "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
+    },
+    {
+        "timestamp": "2026-03-08 15:52:36",
+        "text": "\u001b[36m[INFO]\u001b[0m ETHUB CLI Agent initialized. Model: qwen2.5:0.5b"
+    },
+    {
+        "timestamp": "2026-03-08 15:52:36",
+        "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
+    },
+    {
+        "timestamp": "2026-03-08 19:35:06",
+        "text": "\u001b[36m[INFO]\u001b[0m ETHUB CLI Agent initialized. Model: qwen2.5:0.5b"
+    },
+    {
+        "timestamp": "2026-03-08 19:35:06",
+        "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
+    },
+    {
+        "timestamp": "2026-03-08 19:35:17",
+        "text": "\u001b[31m[ERROR]\u001b[0m Unknown command: /helo"
+    },
+    {
+        "timestamp": "2026-03-08 19:35:21",
+        "text": "\u001b[31m[ERROR]\u001b[0m Unknown command: /helo"
     }
 ]
