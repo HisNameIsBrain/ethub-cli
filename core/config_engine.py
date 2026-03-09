@@ -9,7 +9,14 @@ class ConfigEngine:
         "max_steps": 10,
         "timeout": 120,
         "theme": "rainbow",
-        "search_engines": ["google", "github", "wiki", "stackoverflow"]
+        "search_engines": ["google", "github", "wiki", "stackoverflow"],
+        "is_mothership": True,
+        "mothership_ip": "127.0.0.1",
+        "private_gateway": True,
+        "sync_enabled": True,
+        "cluster_mode": "off",
+        "resource_contribution": 0.1,
+        "knowledge_base_access": True
     }
 
     def __init__(self, config_file="agent-data/config.json"):
