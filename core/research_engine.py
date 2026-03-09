@@ -174,22 +174,42 @@ class ResearchEngine:
                 return results
         except: return []
 
-    def _fetch_page_content(self, url):
+    async def _fetch_page_content(self, url):
         """Fetches page content with safety and security auditing."""
         try:
-            req = urllib.request.Request(url, headers={'User-Agent': self.user_agent})
-            with urllib.request.urlopen(req, timeout=10) as response:
-                html = response.read().decode('utf-8')
-                # Safety Audit
+            # Ensure aiohttp.ClientSession is managed.
+            if not hasattr(self, 'session') or self.session is None or self.session.closed:
+                self.session = aiohttp.ClientSession()
+
+            async with self.session.get(url, headers={'User-Agent': self.user_agent}, timeout=10) as response:
+                response.raise_for_status() # Raise for bad status codes
+                html = await response.text()
+                
+                # Safety Audit (assuming safety.audit_source_chunk is sync for now)
                 is_safe, _ = self.safety.audit_source_chunk("research_verification", url, html[:1000])
                 if not is_safe: return None
 
-                # Clean Text Extraction
-                text = re.sub(r'<(script|style)[^>]*>.*?</\1>', '', html, flags=re.IGNORECASE | re.DOTALL)
-                text = re.sub(r'<[^>]+>', ' ', text)
-                text = re.sub(r'\s+', ' ', text).strip()
+                # Clean Text Extraction with BeautifulSoup
+                soup = BeautifulSoup(html, 'html.parser')
+                # Remove script and style elements
+                for script_or_style in soup(["script", "style"]):
+                    script_or_style.extract()
+
+                text = soup.get_text()
+                # Clean up whitespace
+                lines = (line.strip() for line in text.splitlines())
+                chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+                text = '\n'.join(chunk for chunk in chunks if chunk)
                 return text[:4000]
-        except: return None
+        except aiohttp.ClientConnectorError as e:
+            print(f"Page Fetch Connection Error for {url}: {e}")
+            return None
+        except aiohttp.ClientResponseError as e:
+            print(f"Page Fetch API Error for {url}: Status {e.status}. {e.message}")
+            return None
+        except Exception as e:
+            print(f"Page Fetch Unexpected Error for {url}: {e}")
+            return None
 
     def _analyze_source_credibility(self, query, content):
         """Uses LLM to evaluate the credibility and relevance of a fetched source."""
@@ -212,23 +232,28 @@ class ResearchEngine:
         )
         return self._query_llm(prompt, system_prompt="You are the ETHUB Final Synthesis Engine.")
 
-    def _query_llm(self, prompt, system_prompt=""):
-        payload = {
-            "model": self.model,
-            "messages": [
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': prompt}
-            ],
-            "stream": False
-        }
-        try:
-            req = urllib.request.Request(
-                self.ollama_url, 
-                data=json.dumps(payload).encode('utf-8'), 
-                headers={'Content-Type': 'application/json'}
-            )
-            with urllib.request.urlopen(req, timeout=30) as response:
-                res = json.loads(response.read().decode('utf-8'))
-                return res['message']['content']
-        except Exception as e:
-            return f"LLM Interface Error: {e}"
+        async def _query_llm(self, prompt, system_prompt=""):
+            payload = {
+                "model": self.model,
+                "messages": [
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': prompt}
+                ],
+                "stream": False
+            }
+            try:
+                # Ensure aiohttp.ClientSession is managed. This is a simplified example.
+                # A more robust implementation would manage the session lifecycle at the class level.
+                if not hasattr(self, 'session') or self.session is None or self.session.closed:
+                    self.session = aiohttp.ClientSession()
+    
+                async with self.session.post(self.ollama_url, json=payload, timeout=30) as response:
+                    response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
+                    res = await response.json()
+                    return res['message']['content']
+            except aiohttp.ClientConnectorError as e:
+                return f"LLM Connection Error: Could not connect to Ollama at {self.ollama_url}. Please ensure Ollama is running. Error: {e}"
+            except aiohttp.ClientResponseError as e:
+                return f"LLM API Error: Received status {e.status} from Ollama. Error: {e.message}"
+            except Exception as e:
+                return f"LLM Interface Error: An unexpected error occurred: {e}"

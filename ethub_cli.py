@@ -263,11 +263,21 @@ def run_agent_loop(messages, query=""):
             elif action == "research_topic":
                 topic = args.get('topic', '')
                 helper.log_live("action", f"Researching: {topic}", {"topic": topic})
-                text = f"\x1b[36m[*] Starting Staircase Research on '{topic}'...\x1b[0m"
-                print(text)
-                helper.log_console(text)
-                result = research_engine.execute_staircase(topic)
-                # Convert the result dict to a readable string for the agent
+                
+                # Enhanced user feedback: Indicate research start and encourage observation of detailed steps.
+                progress_message_start = f"\x1b[36m[*] Initiating deep research on '{topic}'. Observe detailed step progress below...\x1b[0m"
+                print(progress_message_start)
+                helper.log_console(progress_message_start)
+
+                # The research_engine.execute_staircase method itself prints detailed step-by-step progress.
+                result = research_engine.execute_staircase(topic) 
+                
+                # Confirmation message after research completion.
+                progress_message_end = f"\x1b[36m[*] Deep research on '{topic}' completed.\x1b[0m"
+                print(progress_message_end)
+                helper.log_console(progress_message_end)
+
+                # Convert the result dict to a readable string for the agent's context.
                 formatted_result = json.dumps(result, indent=2)
                 messages.append({"role": "user", "content": f"Research Results:\n{formatted_result}"})
             elif action == "ethub_return":
