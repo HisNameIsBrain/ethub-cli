@@ -108,10 +108,5 @@
         "timestamp": "2026-03-08 15:34:33",
         "query": "cat README.md",
         "return_id": "20260308_153433"
-    },
-    {
-        "timestamp": "2026-03-09 11:35:56",
-        "query": "helli",
-        "return_id": "20260309_113556"
     }
 ]

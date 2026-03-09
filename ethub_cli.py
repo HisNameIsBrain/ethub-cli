@@ -19,8 +19,8 @@ try:
     from core.helper_engine import HelperEngine
     from core.safety_engine import SafetyEngine
     from core.hybrid_engine import HybridEngine
-    from core.surgical_engine import EthubActionEngine, EthubSurgicalEngine
     from core.return_engine import EthubReturnEngine
+    from core.research_engine import ResearchEngine
     from ui.rainbow_animation import run_intro
 except ImportError as e:
     print(f"Error importing core components: {e}")
@@ -31,16 +31,15 @@ config = ConfigEngine()
 helper = HelperEngine()
 safety_engine = SafetyEngine()
 hybrid_engine = HybridEngine()
-action_engine = EthubActionEngine()
-surgical_engine = EthubSurgicalEngine()
 return_engine = EthubReturnEngine()
+research_engine = ResearchEngine(model=config.get("model", "qwen2.5:0.5b"))
 
 SYSTEM_PROMPT = """You are an autonomous AI agent with web search capabilities.
 You run in a terminal and must help the user by finding information on the web.
 You have access to the following tools:
 1. "web_search": Searches the internet. Requires argument "query".
-2. "fetch_url": Fetches text content from a specific URL. Requires argument "url".
-3. "ethub_action": Performs surgical directory actions (list, read, patch). Requires "sub" (list/read/patch) and "target" (file path). For "patch", also requires "content".
+2. "fetch_url": Fetches text content from a specific URL.
+3. "research_topic": Performs a deep, verified staircase research on a topic. Requires "topic".
 4. "ethub_return": Performs system recovery actions (list/restore/rollback). Requires "sub" (list/restore/rollback). For "restore", requires "point_id". For "rollback", requires "target" (file name).
 5. "final_answer": Provides the final response to the user. Requires argument "text".
 
@@ -131,19 +130,6 @@ def fetch_url(url, query="general_fetch"):
             return text[:3000]
     except Exception as e:
         return f"Fetch failed: {e}"
-
-def ethub_action(sub, target=None, content=None):
-    """Executes a surgical action using the EthubActionEngine."""
-    if sub == "list":
-        return action_engine.list_files()
-    elif sub == "read":
-        if not target: return "Error: 'target' file name required for read."
-        return action_engine.read_target(target)
-    elif sub == "patch":
-        if not target or not content: return "Error: 'target' and 'content' required for patch."
-        return action_engine.apply_patch(target, content)
-    else:
-        return f"Unknown sub-action: {sub}. Use list, read, or patch."
 
 def ethub_return_action(sub, point_id=None, target=None):
     """Executes a recovery action using the EthubReturnEngine."""
@@ -274,16 +260,16 @@ def run_agent_loop(messages, query=""):
                 helper.log_console(text)
                 result = fetch_url(url, query)
                 messages.append({"role": "user", "content": f"Content of {url}:\n{result}"})
-            elif action == "ethub_action":
-                sub = args.get('sub', '')
-                target = args.get('target', '')
-                content = args.get('content', '')
-                helper.log_live("action", f"Surgical Action: {sub} {target}", {"sub": sub, "target": target})
-                text = f"\x1b[35m[*] Executing surgical {sub} on {target}...\x1b[0m"
+            elif action == "research_topic":
+                topic = args.get('topic', '')
+                helper.log_live("action", f"Researching: {topic}", {"topic": topic})
+                text = f"\x1b[36m[*] Starting Staircase Research on '{topic}'...\x1b[0m"
                 print(text)
                 helper.log_console(text)
-                result = ethub_action(sub, target, content)
-                messages.append({"role": "user", "content": f"Result of surgical {sub}:\n{result}"})
+                result = research_engine.execute_staircase(topic)
+                # Convert the result dict to a readable string for the agent
+                formatted_result = json.dumps(result, indent=2)
+                messages.append({"role": "user", "content": f"Research Results:\n{formatted_result}"})
             elif action == "ethub_return":
                 sub = args.get('sub', '')
                 point_id = args.get('point_id', '')
@@ -321,7 +307,6 @@ def handle_command(cmd_input, messages):
             "/search q   - Perform a manual web search\n"
             "/sysinfo    - Show system information\n"
             "/train cmd  - Manage training data (add, list, clear, import)\n"
-            "/action cmd - Surgical Directory Actions (list, read <f>, patch <f> <c>)\n"
             "/return cmd - System Recovery (list, <point_id>)\n"
             "/web cmd    - Web Dashboard (start, stop)\n"
             "/ollama cmd - Help for Ollama"
@@ -329,29 +314,6 @@ def handle_command(cmd_input, messages):
         print(helper.format_box(help_text, title="ETHUB SURGICAL COMMANDS"))
     elif cmd == "/clear":
         helper.clear_screen()
-    elif cmd == "/action":
-        if len(parts) > 1:
-            sub = parts[1].lower()
-            if sub == "list":
-                print(action_engine.list_files())
-            elif sub == "read":
-                if len(parts) > 2:
-                    print(action_engine.read_target(parts[2]))
-                else:
-                    helper.print_error("Usage: /action read <file_name>")
-            elif sub == "patch":
-                if len(parts) > 3:
-                    file_name = parts[2]
-                    content = " ".join(parts[3:])
-                    # For terminal convenience, allow escaped newlines
-                    content = content.replace("\\n", "\n")
-                    print(action_engine.apply_patch(file_name, content))
-                else:
-                    helper.print_error("Usage: /action patch <file_name> <content>")
-            else:
-                helper.print_error(f"Unknown action sub-command: {sub}")
-        else:
-            helper.print_error("Usage: /action [list | read <f> | patch <f> <c>]")
     elif cmd == "/settings":
         settings = config.list_settings()
         print(helper.format_box(json.dumps(settings, indent=4), title="Settings"))
