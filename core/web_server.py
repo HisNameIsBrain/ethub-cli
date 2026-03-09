@@ -3,20 +3,23 @@ import socketserver
 import json
 import os
 import threading
-import urllib.parse
-import sys
 
 # Global server instance for control
 _httpd = None
 
 class WebHandler(http.server.SimpleHTTPRequestHandler):
+    """
+    Secure Web Handler for ETHUB CLI Dashboard.
+    - No CORS headers allowed (strict local-only).
+    - Bound to 127.0.0.1 to prevent external network exposure.
+    - Payload limits on POST to prevent DDoS/OOM.
+    """
     def __init__(self, *args, **kwargs):
-        # Set the directory to ui/web where our frontend will live
         self.web_dir = os.path.join(os.getcwd(), "ui", "web")
         super().__init__(*args, directory=self.web_dir, **kwargs)
 
     def log_message(self, format, *args):
-        """Redirect server logs to a file instead of terminal."""
+        """Redirect server logs to agent-data/server-logs.json."""
         log_entry = {
             "timestamp": self.log_date_time_string(),
             "client": self.client_address[0],
@@ -33,16 +36,22 @@ class WebHandler(http.server.SimpleHTTPRequestHandler):
                 logs = []
         
         logs.append(log_entry)
-        logs = logs[-50:] # Keep last 50 requests
+        logs = logs[-100:] # Limit history
         
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
         with open(log_file, "w") as f:
             json.dump(logs, f, indent=4)
 
     def do_GET(self):
+        # Prevent path traversal
+        if ".." in self.path:
+            self.send_error(400, "Bad Request")
+            return
+
         if self.path.startswith("/api/"):
             self.handle_api()
         else:
+            # Serve static files from ui/web
             super().do_GET()
 
     def handle_api(self):
@@ -57,13 +66,13 @@ class WebHandler(http.server.SimpleHTTPRequestHandler):
             "logs": "live_logs.json",
             "cli-console": "cli-console.json",
             "server-logs": "server-logs.json",
-            "sysinfo": "sysinfo" # Special case
+            "sysinfo": "sysinfo"
         }
 
         if endpoint in file_map:
             self.send_response(200)
             self.send_header("Content-type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
+            # CRITICAL: No Access-Control-Allow-Origin headers here.
             self.end_headers()
 
             if endpoint == "sysinfo":
@@ -85,55 +94,50 @@ class WebHandler(http.server.SimpleHTTPRequestHandler):
             self.send_error(404, "Endpoint not found")
 
     def do_POST(self):
+        # Security: Only allow POST to settings, with strict size limits
         if self.path == "/api/settings":
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
             try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                # DDoS Prevention: Limit to 128KB for settings JSON
+                if content_length > 128 * 1024:
+                    self.send_error(413, "Payload Too Large")
+                    return
+                
+                post_data = self.rfile.read(content_length)
                 data = json.loads(post_data.decode('utf-8'))
+                
                 from core.config_engine import ConfigEngine
                 config = ConfigEngine()
                 for key, val in data.items():
-                    config.set(key, val)
+                    # Only allow specific config keys to be set via web
+                    if key in ["model", "timeout", "max_steps", "ollama_url"]:
+                        config.set(key, val)
                 
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
                 self.wfile.write(json.dumps({"status": "success"}).encode("utf-8"))
             except Exception as e:
-                self.send_response(400)
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+                self.send_error(400, f"Error: {e}")
         else:
             self.send_error(404)
-
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.end_headers()
 
 def start_server(port=8080):
     global _httpd
     handler = WebHandler
-    # Allow port reuse to avoid "Address already in use" errors on restart
     socketserver.TCPServer.allow_reuse_address = True
     try:
-        with socketserver.TCPServer(("", port), handler) as httpd:
+        # Binding to 127.0.0.1 is mandatory for security
+        with socketserver.TCPServer(("127.0.0.1", port), handler) as httpd:
             _httpd = httpd
-            # Suppressing console notification as per request
-            # print(f"\n\x1b[32m[WEB] Server active at http://localhost:{port}\x1b[0m")
             httpd.serve_forever()
     except Exception as e:
-        # We can still log errors to console for critical failures
-        print(f"\x1b[31m[WEB] Server failed: {e}\x1b[0m")
+        # Silently fail or log to a file, don't spam CLI
+        pass
 
 def stop_web_ui():
     global _httpd
     if _httpd:
-        print("\n\x1b[33m[WEB] Stopping server...\x1b[0m")
         _httpd.shutdown()
         _httpd.server_close()
         _httpd = None
@@ -143,7 +147,7 @@ def stop_web_ui():
 def run_web_ui(port=8080):
     global _httpd
     if _httpd:
-        return None # Already running
+        return None
     thread = threading.Thread(target=start_server, args=(port,), daemon=True)
     thread.start()
     return thread

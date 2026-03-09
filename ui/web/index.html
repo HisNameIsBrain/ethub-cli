@@ -6,28 +6,28 @@
     <title>ETHUB CLI Advanced Dashboard</title>
     <style>
         :root {
-            --bg: #0b0e14;
-            --card-bg: #151921;
+            --bg: #0d1117;
+            --card-bg: #161b22;
             --accent: #58a6ff;
             --text: #c9d1d9;
             --muted: #8b949e;
-            --success: #2ea043;
-            --error: #f85149;
+            --success: #238636;
+            --error: #da3633;
             --warning: #d29922;
             --border: #30363d;
-            --code-bg: #000000;
+            --code-bg: #010409;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
             background-color: var(--bg);
             color: var(--text);
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             display: grid;
-            grid-template-columns: 320px 1fr 320px;
+            grid-template-columns: 350px 1fr 350px;
             grid-template-rows: auto 1fr;
-            gap: 20px;
+            gap: 15px;
             height: 100vh;
             box-sizing: border-box;
             overflow: hidden;
@@ -40,657 +40,313 @@
             align-items: center;
             border-bottom: 1px solid var(--border);
             padding-bottom: 10px;
+            background: rgba(0,0,0,0.2);
+            padding: 10px 20px;
+            margin: -15px -15px 10px -15px;
         }
 
-        h1 { color: var(--accent); margin: 0; font-size: 1.4rem; font-weight: 600; letter-spacing: -0.5px; }
+        h1 { color: var(--accent); margin: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
 
         .card {
             background-color: var(--card-bg);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 0;
+            border-radius: 6px;
             display: flex;
             flex-direction: column;
             overflow: hidden;
         }
 
         .card-header {
-            padding: 10px 15px;
+            padding: 8px 12px;
             border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: rgba(255,255,255,0.03);
+            background: rgba(255,255,255,0.02);
         }
 
-        .card-header h2 { font-size: 0.9rem; margin: 0; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+        .card-header h2 { font-size: 0.8rem; margin: 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
 
         .card-body {
-            padding: 15px;
+            padding: 12px;
             flex: 1;
             overflow-y: auto;
         }
 
-        .sidebar { display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
-
-        #live-console { font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.85rem; }
-
+        /* Console and Logs */
         .log-entry {
-            margin-bottom: 12px;
-            border-left: 3px solid #333;
-            padding-left: 10px;
-            animation: fadeIn 0.3s ease-in;
-        }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
-        .log-info { border-color: var(--accent); }
-        .log-success { border-color: var(--success); }
-        .log-warning { border-color: var(--warning); }
-        .log-error { border-color: var(--error); }
-        .log-thought { border-color: #bc8cff; }
-        .log-reasoning { border-color: #ff7b72; }
-        .log-action { border-color: #ffa657; }
-
-        .cli-console-block {
-            background: #1a1f29;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            margin-top: 15px;
-        }
-
-        .cli-console-header {
-            padding: 8px 12px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(255,255,255,0.05);
-            font-size: 0.8rem;
-            color: var(--accent);
-        }
-
-        .cli-console-content {
-            padding: 10px;
-            max-height: 200px;
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 0.8rem;
-            display: none;
-            background: #000;
-        }
-
-        .cli-console-content.open { display: block; }
-
-        .server-logs-block {
-            background: #14181f;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            margin-top: 10px;
-        }
-
-        .server-logs-header {
-            padding: 6px 12px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(255,255,255,0.03);
-            font-size: 0.75rem;
-            color: var(--muted);
-        }
-
-        .server-logs-content {
+            margin-bottom: 10px;
             padding: 8px;
-            max-height: 150px;
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 0.7rem;
-            display: none;
-            background: #000;
-        }
-
-        .server-logs-content.open { display: block; }
-
-        .setting-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
-
-        .setting-item:last-child { border-bottom: none; }
-
-        .setting-label { font-size: 0.85rem; color: var(--text); }
-
-        .setting-control {
-            display: flex;
-            gap: 5px;
-            align-items: center;
-        }
-
-        button {
-            background: var(--accent);
-            color: white;
-            border: none;
-            padding: 4px 10px;
             border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.75rem;
-            transition: opacity 0.2s;
-        }
-
-        button:hover { opacity: 0.8; }
-
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 34px;
-            height: 20px;
-        }
-
-        .switch input { opacity: 0; width: 0; height: 0; }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #333;
-            transition: .4s;
-            border-radius: 34px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 14px; width: 14px;
-            left: 3px; bottom: 3px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-
-        input:checked + .slider { background-color: var(--success); }
-        input:checked + .slider:before { transform: translateX(14px); }
-
-        .analytics-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .analytics-card {
-            background: rgba(255,255,255,0.03);
-            padding: 10px;
-            border-radius: 6px;
-            text-align: center;
-        }
-
-        .analytics-val { font-size: 1.2rem; font-weight: bold; color: var(--accent); }
-        .analytics-lbl { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; }
-
-        .progress-container {
-            margin-top: 15px;
-            background: #222;
-            border-radius: 4px;
-            height: 20px;
-            position: relative;
-            overflow: hidden;
-            border: 1px solid var(--border);
-        }
-
-        .progress-bar {
-            height: 100%;
-            background: linear-gradient(90deg, var(--success), var(--warning), var(--error));
-            width: 0%;
-            transition: width 0.5s ease;
-        }
-
-        .progress-text {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 0.7rem;
-            color: #fff;
-            text-shadow: 0 0 3px #000;
-        }
-
-        .log-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
-
-        nav {
-            grid-column: 1 / -1;
-            display: flex;
-            gap: 20px;
-            background: rgba(255,255,255,0.02);
-            padding: 10px 20px;
-            border-bottom: 1px solid var(--border);
-            margin: -20px -20px 0 -20px;
-            z-index: 100;
-        }
-
-        .nav-item {
-            font-size: 0.9rem;
-            color: var(--muted);
-            cursor: pointer;
-            padding: 5px 10px;
-            border-radius: 4px;
-            transition: background 0.2s;
-        }
-
-        .nav-item.active {
-            color: var(--accent);
-            background: rgba(88, 166, 255, 0.1);
-        }
-
-        footer {
-            grid-column: 1 / -1;
-            padding: 10px;
-            border-top: 1px solid var(--border);
-            text-align: center;
-            font-size: 0.75rem;
-            color: var(--muted);
             background: rgba(0,0,0,0.2);
-            margin: 0 -20px -20px -20px;
-            display: none;
+            border-left: 3px solid #333;
+            font-size: 0.85rem;
         }
 
-        .view-section { display: none; height: 100%; }
-        .view-section.active { display: flex; flex-direction: column; }
-        .log-time { font-size: 0.75rem; color: var(--muted); }
-        .log-cat { font-size: 0.75rem; font-weight: bold; text-transform: uppercase; }
+        .log-thought { border-color: #bc8cff; background: rgba(188, 140, 255, 0.05); }
+        .log-action { border-color: #ffa657; background: rgba(255, 166, 87, 0.05); }
+        .log-error { border-color: var(--error); background: rgba(218, 54, 51, 0.05); }
+        .log-success { border-color: var(--success); background: rgba(35, 134, 54, 0.05); }
 
-        .log-msg { margin-bottom: 5px; }
-
+        .log-meta { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 0.7rem; color: var(--muted); }
+        .log-category { font-weight: bold; text-transform: uppercase; }
+        
         details {
-            background: rgba(0,0,0,0.2);
+            margin-top: 6px;
+            border: 1px solid var(--border);
             border-radius: 4px;
-            margin-top: 5px;
+            background: var(--code-bg);
         }
 
         summary {
-            padding: 5px 8px;
+            padding: 4px 8px;
             cursor: pointer;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: var(--accent);
             outline: none;
         }
 
-        summary:hover { text-decoration: underline; }
-
         pre {
-            background: var(--code-bg);
-            padding: 10px;
-            border-radius: 4px;
-            overflow-x: auto;
             margin: 0;
-            color: #d1d5db;
-            font-size: 0.8rem;
+            padding: 8px;
+            overflow-x: auto;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.75rem;
+            line-height: 1.4;
         }
 
+        /* JSON Syntax Highlighting */
         .json-key { color: #79c0ff; }
         .json-string { color: #a5d6ff; }
         .json-number { color: #ff7b72; }
         .json-boolean { color: #ffa657; }
 
-        /* Code Highlighting Styles */
-        .token-keyword { color: #ff7b72; font-weight: bold; }
-        .token-string { color: #a5d6ff; }
-        .token-comment { color: #8b949e; font-style: italic; }
-        .token-number { color: #d2a8ff; }
-        .token-function { color: #d2a8ff; }
-
-        /* ANSI Colors */
-        .ansi-31 { color: var(--error); }
-        .ansi-32 { color: var(--success); }
-        .ansi-33 { color: var(--warning); }
-        .ansi-36 { color: var(--accent); }
-        .ansi-90 { color: #6e7681; }
-
-        #analytics-tabs {
-            display: flex;
-            gap: 10px;
-            padding: 0 15px;
-            border-bottom: 1px solid var(--border);
-            background: rgba(0,0,0,0.2);
+        /* CLI Block */
+        .cli-block {
+            background: #000;
+            border-radius: 4px;
+            padding: 8px;
+            height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.75rem;
+            border: 1px solid var(--border);
+            margin-bottom: 10px;
         }
 
-        .tab {
-            padding: 8px 12px;
-            font-size: 0.8rem;
+        /* Analytics Tab */
+        .tabs { display: flex; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.1); }
+        .tab { padding: 6px 12px; cursor: pointer; font-size: 0.75rem; color: var(--muted); border-bottom: 2px solid transparent; }
+        .tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(88, 166, 255, 0.05); }
+
+        /* Controls */
+        .controls { display: flex; gap: 8px; margin-top: 10px; }
+        button {
+            background: #21262d;
+            color: #c9d1d9;
+            border: 1px solid var(--border);
+            padding: 4px 10px;
+            border-radius: 4px;
             cursor: pointer;
-            border-bottom: 2px solid transparent;
-            color: var(--muted);
+            font-size: 0.75rem;
+            transition: 0.2s;
         }
+        button:hover { background: #30363d; border-color: #8b949e; }
+        button.primary { background: var(--success); color: white; border: none; }
+        button.danger { background: var(--error); color: white; border: none; }
 
-        .tab.active {
-            border-color: var(--accent);
-            color: var(--accent);
-        }
+        .status-pill { padding: 2px 8px; border-radius: 10px; font-size: 0.65rem; font-weight: bold; text-transform: uppercase; }
+        .status-active { background: rgba(35, 134, 54, 0.2); color: var(--success); }
+        .status-idle { background: rgba(139, 148, 158, 0.2); color: var(--muted); }
 
-        .status-badge { padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
-        .status-online { background: rgba(46, 160, 67, 0.2); color: var(--success); border: 1px solid var(--success); }
-        .status-offline { background: rgba(248, 81, 73, 0.2); color: var(--error); border: 1px solid var(--error); }
-
-        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #484f58; }
+
+        .analytics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .stat-box { background: rgba(255,255,255,0.03); padding: 8px; border-radius: 4px; text-align: center; }
+        .stat-val { font-size: 1.1rem; font-weight: bold; color: var(--accent); }
+        .stat-lbl { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; }
     </style>
 </head>
 <body>
-    <nav>
-        <div class="nav-item active" onclick="switchView('console', this)">📟 Console</div>
-        <div class="nav-item" onclick="switchView('settings', this)">⚙️ Settings</div>
-    </nav>
     <header>
-        <h1>🧬 ETHUB HYBRIS <span style="font-weight: 200; opacity: 0.6;">DASHBOARD</span></h1>
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <span id="last-update" style="font-size: 0.8rem; color: var(--muted);"></span>
-            <span class="status-badge status-online" id="conn-status">LIVE</span>
+        <h1>🌈 ETHUB CLI <span style="font-weight: 200; font-size: 0.8rem; opacity: 0.7;">CONTROL CENTER</span></h1>
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <div id="connection-status" class="status-pill status-active">Connected</div>
+            <div id="sync-time" style="font-size: 0.7rem; color: var(--muted);"></div>
         </div>
     </header>
 
     <div class="sidebar">
-        <div class="card" style="height: 100%;">
-            <div class="card-header"><h2>📊 Advanced Analytics</h2></div>
+        <div class="card" style="height: 40%;">
+            <div class="card-header"><h2>⚙️ System Control</h2></div>
+            <div class="card-body">
+                <div id="sys-status-ui">
+                    <div style="font-size: 0.8rem; margin-bottom: 10px;">Web Server: <span style="color:var(--success)">Running</span></div>
+                    <div class="controls">
+                        <button class="primary" onclick="window.location.reload()">Refresh UI</button>
+                        <button class="danger" onclick="alert('Stop command must be issued from CLI for security.')">Emergency Stop</button>
+                    </div>
+                </div>
+                <div style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px;">
+                    <div class="stat-lbl">Active Model</div>
+                    <div id="active-model" style="font-size: 0.85rem; font-weight: bold; color: var(--accent);">Loading...</div>
+                </div>
+            </div>
+        </div>
+        <div class="card" style="height: 58.5%; margin-top: 15px;">
+            <div class="card-header"><h2>📊 Analytics</h2></div>
             <div class="card-body">
                 <div class="analytics-grid">
-                    <div class="analytics-card">
-                        <div class="analytics-val" id="stat-logs">0</div>
-                        <div class="analytics-lbl">Total Logs</div>
-                    </div>
-                    <div class="analytics-card">
-                        <div class="analytics-val" id="stat-actions">0</div>
-                        <div class="analytics-lbl">Actions</div>
-                    </div>
-                    <div class="analytics-card">
-                        <div class="analytics-val" id="stat-thoughts">0</div>
-                        <div class="analytics-lbl">Thoughts</div>
-                    </div>
-                    <div class="analytics-card">
-                        <div class="analytics-val" id="stat-errors">0</div>
-                        <div class="analytics-lbl">Errors</div>
-                    </div>
-                </div>
-                
-                <div style="margin-top: 20px;">
-                    <div class="analytics-lbl">Context Window Usage (8k Cap)</div>
-                    <div class="progress-container">
-                        <div class="progress-bar" id="context-bar"></div>
-                        <div class="progress-text" id="context-text">0 / 8192 Tokens</div>
-                    </div>
-                </div>
-
-                <div style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px;">
-                    <div id="sysinfo-list"></div>
+                    <div class="stat-box"><div class="stat-val" id="stat-thoughts">0</div><div class="stat-lbl">Thoughts</div></div>
+                    <div class="stat-box"><div class="stat-val" id="stat-actions">0</div><div class="stat-lbl">Actions</div></div>
+                    <div class="stat-box"><div class="stat-val" id="stat-errors">0</div><div class="stat-lbl">Errors</div></div>
+                    <div class="stat-box"><div class="stat-val" id="stat-risks">0</div><div class="stat-lbl">Risks</div></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="card" id="main-console">
-        <div id="view-console" class="view-section active">
-            <div class="card-header">
-                <h2>🛸 Hyper-Detailed Reasoning & Console</h2>
-                <div style="font-size: 0.7rem; color: var(--muted);">REAL-TIME STREAM</div>
-            </div>
-            <div class="card-body">
-                <div class="cli-console-block">
-                    <div class="cli-console-header" onclick="document.getElementById('cli-console-content').classList.toggle('open')">
-                        <span>📟 Live CLI Console (cli-console.json)</span>
-                        <span>Click to Expand/Collapse</span>
-                    </div>
-                    <div class="cli-console-content" id="cli-console-content"></div>
-                </div>
-                <div class="server-logs-block">
-                    <div class="server-logs-header" onclick="document.getElementById('server-logs-content').classList.toggle('open')">
-                        <span>📡 HTTP Server Traffic (server-logs.json)</span>
-                        <span>Click to View API Requests</span>
-                    </div>
-                    <div class="server-logs-content" id="server-logs-content"></div>
-                </div>
-                <div id="live-console" style="margin-top: 15px;">
-                    <div style="color: var(--muted); text-align: center; margin-top: 100px;">Waiting for engine activity...</div>
-                </div>
-            </div>
+    <div class="card">
+        <div class="card-header">
+            <h2>🧩 Hyper-Detailed Reasoning Flow</h2>
+            <div id="agent-status" class="status-pill status-idle">Idle</div>
         </div>
-        <div id="view-settings" class="view-section">
-            <div class="card-header">
-                <h2>⚙️ Engine Settings & Controls</h2>
-                <div style="font-size: 0.7rem; color: var(--muted);">MODIFY ENGINE BEHAVIOR</div>
-            </div>
-            <div class="card-body" id="settings-list">
-                <div style="color:var(--muted); text-align:center; margin-top:50px;">Loading settings...</div>
+        <div class="card-body" id="reasoning-flow">
+            <div style="text-align: center; margin-top: 100px; color: var(--muted); font-size: 0.8rem;">
+                No reasoning stream detected. Start a task in the CLI.
             </div>
         </div>
     </div>
 
     <div class="sidebar">
-        <div class="card" style="height: 100%;">
-            <div class="card-header"><h2>📖 Knowledge & History</h2></div>
-            <div id="analytics-tabs">
-                <div class="tab active" onclick="setAnalyticsTab('history')">History</div>
-                <div class="tab" onclick="setAnalyticsTab('risks')">Risks</div>
-                <div class="tab" onclick="setAnalyticsTab('memory')">Memory</div>
+        <div class="card" style="height: 30%;">
+            <div class="card-header"><h2>📟 CLI Output</h2></div>
+            <div class="card-body">
+                <div class="cli-block" id="cli-output"></div>
             </div>
-            <div class="card-body" id="analytics-content"></div>
+        </div>
+        <div class="card" style="height: 68.5%; margin-top: 15px;">
+            <div class="tabs">
+                <div class="tab active" onclick="setTab('history')">History</div>
+                <div class="tab" onclick="setTab('risks')">Risks</div>
+                <div class="tab" onclick="setTab('settings')">Settings</div>
+            </div>
+            <div class="card-body" id="tab-content" style="padding: 0;">
+                <div style="padding: 20px; text-align: center; color: var(--muted);">Loading...</div>
+            </div>
         </div>
     </div>
 
-    <footer id="dashboard-footer">
-        ETHUB DASHBOARD DEBUGGING ONLINE | AUTO-SYNC ACTIVE
-    </footer>
+    <script>
+        let currentTab = 'history';
+        const API = "/api";
 
-        const API_URL = "http://localhost:8080/api";
-        let currentAnalyticsTab = 'history';
-
-        function switchView(view, el) {
-            document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            
-            document.getElementById('view-' + view).classList.add('active');
-            el.classList.add('active');
-        }
-
-        function syntaxHighlight(json) {
-            if (typeof json !== 'string') {
-                json = JSON.stringify(json, undefined, 2);
-            }
-            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g, function (match) {
-                var cls = 'json-number';
-                if (/^"/.test(match)) {
-                    if (/:$/.test(match)) {
-                        cls = 'json-key';
-                    } else {
-                        cls = 'json-string';
-                    }
-                } else if (/true|false/.test(match)) {
-                    cls = 'json-boolean';
-                } else if (/null/.test(match)) {
-                    cls = 'json-null';
-                }
-                return '<span class="' + cls + '">' + match + '</span>';
-            });
-        }
-
-        async function fetchData(endpoint) {
-            try {
-                const res = await fetch(`${API_URL}/${endpoint}`);
-                if (!res.ok) throw new Error("Offline");
-                
-                document.getElementById('conn-status').innerText = "LIVE";
-                document.getElementById('conn-status').className = "status-badge status-online";
-                document.getElementById('dashboard-footer').style.display = 'block';
-                
-                return await res.json();
-            } catch (e) {
-                document.getElementById('conn-status').innerText = "OFFLINE";
-                document.getElementById('conn-status').className = "status-badge status-offline";
-                document.getElementById('dashboard-footer').style.display = 'none';
-                return null;
-            }
-        }
-
-        function setAnalyticsTab(tab) {
-            currentAnalyticsTab = tab;
+        function setTab(tab) {
+            currentTab = tab;
             document.querySelectorAll('.tab').forEach(t => {
                 t.classList.remove('active');
                 if (t.innerText.toLowerCase() === tab) t.classList.add('active');
             });
-            refreshAnalytics();
+            refreshTab();
         }
 
-        async function refreshAnalytics() {
-            const data = await fetchData(currentAnalyticsTab);
-            const content = document.getElementById('analytics-content');
-            if (data) {
-                content.innerHTML = `<pre>${syntaxHighlight(data)}</pre>`;
-            } else {
-                content.innerHTML = `<div style="color:var(--muted)">No data available for ${currentAnalyticsTab}</div>`;
+        function syntaxHighlight(json) {
+            if (typeof json !== 'string') json = JSON.stringify(json, undefined, 2);
+            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g, function (match) {
+                var cls = 'json-number';
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) cls = 'json-key';
+                    else cls = 'json-string';
+                } else if (/true|false/.test(match)) cls = 'json-boolean';
+                return '<span class="' + cls + '">' + match + '</span>';
+            });
+        }
+
+        async function refreshTab() {
+            const res = await fetch(`${API}/${currentTab}`);
+            if (res.ok) {
+                const data = await res.json();
+                const content = document.getElementById('tab-content');
+                content.innerHTML = `<pre style="padding: 10px;">${syntaxHighlight(data)}</pre>`;
             }
         }
 
-        async function updateSetting(key, val) {
+        async function sync() {
             try {
-                const response = await fetch(`${API_URL}/settings`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ [key]: val })
-                });
-                if (response.ok) refresh();
+                const logsRes = await fetch(`${API}/logs`);
+                const cliRes = await fetch(`${API}/cli-console`);
+                const settingsRes = await fetch(`${API}/settings`);
+                const risksRes = await fetch(`${API}/risks`);
+
+                if (logsRes.ok && cliRes.ok && settingsRes.ok && risksRes.ok) {
+                    const logs = await logsRes.json();
+                    const cli = await cliRes.json();
+                    const settings = await settingsRes.json();
+                    const risks = await risksRes.json();
+
+                    document.getElementById('sync-time').innerText = `Synced: ${new Date().toLocaleTimeString()}`;
+                    document.getElementById('active-model').innerText = settings.model || "Unknown";
+
+                    // Analytics
+                    const thoughts = logs.filter(l => l.category === 'thought').length;
+                    const actions = logs.filter(l => l.category === 'action').length;
+                    const errors = logs.filter(l => l.category === 'error').length;
+                    
+                    document.getElementById('stat-thoughts').innerText = thoughts;
+                    document.getElementById('stat-actions').innerText = actions;
+                    document.getElementById('stat-errors').innerText = errors;
+                    document.getElementById('stat-risks').innerText = Array.isArray(risks) ? risks.length : 0;
+
+                    // Reasoning Flow
+                    const flow = document.getElementById('reasoning-flow');
+                    if (logs.length > 0) {
+                        flow.innerHTML = logs.slice().reverse().filter(l => ['thought', 'action', 'error', 'success'].includes(l.category)).map(log => `
+                            <div class="log-entry log-${log.category}">
+                                <div class="log-meta">
+                                    <span class="log-category">${log.category}</span>
+                                    <span>${log.timestamp}</span>
+                                </div>
+                                <div class="log-msg">${log.message}</div>
+                                ${log.details && Object.keys(log.details).length > 0 ? `
+                                    <details>
+                                        <summary>🔍 Deep Detail (Inspect JSON)</summary>
+                                        <pre>${syntaxHighlight(log.details)}</pre>
+                                    </details>
+                                ` : ''}
+                            </div>
+                        `).join('');
+                        
+                        document.getElementById('agent-status').innerText = "Processing";
+                        document.getElementById('agent-status').className = "status-pill status-active";
+                    } else {
+                        document.getElementById('agent-status').innerText = "Idle";
+                        document.getElementById('agent-status').className = "status-pill status-idle";
+                    }
+
+                    // CLI Output
+                    const cliOut = document.getElementById('cli-output');
+                    cliOut.innerHTML = cli.map(c => `
+                        <div style="margin-bottom: 4px;">
+                            <span style="color: #555;">[${c.timestamp.split(' ')[1]}]</span> 
+                            ${c.text.replace(/\x1b\[[0-9;]*m/g, '')}
+                        </div>
+                    `).join('');
+                    cliOut.scrollTop = cliOut.scrollHeight;
+
+                    if (currentTab !== 'history') refreshTab();
+                }
             } catch (e) {
-                console.error("Failed to update setting", e);
+                document.getElementById('connection-status').innerText = "Disconnected";
+                document.getElementById('connection-status').className = "status-pill status-idle";
             }
         }
 
-        function renderSettings(settings) {
-            const list = document.getElementById('settings-list');
-            list.innerHTML = Object.entries(settings).map(([key, val]) => {
-                if (typeof val === 'boolean') {
-                    return `
-                        <div class="setting-item">
-                            <span class="setting-label">${key}</span>
-                            <label class="switch">
-                                <input type="checkbox" ${val ? 'checked' : ''} onchange="updateSetting('${key}', this.checked)">
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                    `;
-                } else if (typeof val === 'number') {
-                    return `
-                        <div class="setting-item">
-                            <span class="setting-label">${key}</span>
-                            <div class="setting-control">
-                                <span style="font-size:0.8rem; margin-right:5px;">${val}</span>
-                                <button onclick="updateSetting('${key}', ${val-1})">-</button>
-                                <button onclick="updateSetting('${key}', ${val+1})">+</button>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    return `
-                        <div class="setting-item">
-                            <span class="setting-label">${key}</span>
-                            <div class="setting-control">
-                                <input type="text" value="${val}" style="background:#000; color:#fff; border:1px solid #333; font-size:0.75rem; padding:2px 5px; width:80px;" onchange="updateSetting('${key}', this.value)">
-                            </div>
-                        </div>
-                    `;
-                }
-            }).join('');
-        }
-
-        async function refresh() {
-            const lastUpdate = new Date().toLocaleTimeString();
-            document.getElementById('last-update').innerText = `Sync: ${lastUpdate}`;
-            document.getElementById('conn-status').innerText = "LIVE";
-            document.getElementById('conn-status').className = "status-badge status-online";
-
-            // 1. Logs & Analytics
-            const logs = await fetchData('logs');
-            if (logs) {
-                const consoleDiv = document.getElementById('live-console');
-                const html = [...logs].reverse().map(log => `
-                    <div class="log-entry log-${log.category}">
-                        <div class="log-header">
-                            <span class="log-cat">${log.category}</span>
-                            <span class="log-time">${log.timestamp}</span>
-                        </div>
-                        <div class="log-msg">${log.message}</div>
-                        ${log.details && Object.keys(log.details).length > 0 ? `
-                            <details>
-                                <summary>Expand Details</summary>
-                                <pre>${syntaxHighlight(log.details)}</pre>
-                            </details>
-                        ` : ''}
-                    </div>
-                `).join('');
-                consoleDiv.innerHTML = html || "No activity logs yet.";
-
-                // Stats
-                document.getElementById('stat-logs').innerText = logs.length;
-                document.getElementById('stat-actions').innerText = logs.filter(l => l.category === 'action').length;
-                document.getElementById('stat-thoughts').innerText = logs.filter(l => l.category === 'thought').length;
-                document.getElementById('stat-errors').innerText = logs.filter(l => l.category === 'error').length;
-
-                // Context Bar
-                const contextLog = [...logs].reverse().find(l => l.category === 'context');
-                if (contextLog && contextLog.details) {
-                    const tokens = contextLog.details.tokens;
-                    const maxTokens = 8192; // Typical small model window
-                    const pct = Math.min((tokens / maxTokens) * 100, 100);
-                    document.getElementById('context-bar').style.width = pct + '%';
-                    document.getElementById('context-text').innerText = `${tokens} / ${maxTokens} Tokens`;
-                }
-            }
-
-            // 2. CLI Console
-            const cliLogs = await fetchData('cli-console');
-            if (cliLogs) {
-                const cliContent = document.getElementById('cli-console-content');
-                cliContent.innerHTML = cliLogs.map(l => `
-                    <div style="margin-bottom:2px; white-space: pre-wrap;">
-                        <span style="color:#555;">[${l.timestamp.split(' ')[1]}]</span> ${l.text.replace(/\x1b\[[0-9;]*m/g, '')}
-                    </div>
-                `).join('');
-            }
-
-            // 3. Server Traffic
-            const serverLogs = await fetchData('server-logs');
-            if (serverLogs) {
-                const srvContent = document.getElementById('server-logs-content');
-                srvContent.innerHTML = serverLogs.map(l => `
-                    <div style="margin-bottom:2px; border-bottom:1px solid #111;">
-                        <span style="color:var(--accent); font-size:0.65rem;">${l.timestamp}</span> 
-                        <span style="color:var(--success); font-weight:bold;">${l.client}</span> 
-                        <span style="color:#ddd;">${l.message}</span>
-                    </div>
-                `).reverse().join('');
-            }
-
-            // 4. Settings
-            const settings = await fetchData('settings');
-            if (settings) {
-                renderSettings(settings);
-            }
-
-            // 4. Sysinfo
-            const sysinfo = await fetchData('sysinfo');
-            if (sysinfo) {
-                document.getElementById('sysinfo-list').innerHTML = `
-                    <div style="font-size:0.75rem; color:var(--muted); margin-bottom:5px;">System: ${sysinfo.os} ${sysinfo.machine}</div>
-                    <div style="font-size:0.7rem; color:var(--muted);">CWD: ${sysinfo.cwd}</div>
-                `;
-            }
-
-            refreshAnalytics();
-        }
-
-        setInterval(refresh, 2000);
-        refresh();
+        setInterval(sync, 2000);
+        sync();
+        setTab('history');
     </script>
 </body>
 </html>

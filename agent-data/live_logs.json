@@ -1,77 +1,11 @@
 [
     {
-        "timestamp": "2026-03-08 05:30:34",
-        "category": "info",
-        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 05:30:34",
-        "category": "info",
-        "message": "Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback.",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 05:39:29",
-        "category": "info",
-        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 05:39:29",
-        "category": "info",
-        "message": "Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback.",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 05:42:24",
-        "category": "info",
-        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 05:42:25",
-        "category": "info",
-        "message": "Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback.",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 05:42:48",
-        "category": "info",
-        "message": "Ollama Commands: /ollama pull [model]",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 05:42:51",
-        "category": "info",
-        "message": "Ollama Commands: /ollama pull [model]",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 05:44:08",
-        "category": "info",
-        "message": "Searching for: q What other helpers could a web search agent have",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 05:44:47",
-        "category": "info",
-        "message": "Agent is thinking...",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 05:44:47",
-        "category": "info",
-        "message": "Snapshot created: 20260308_054447_531142",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 05:44:54",
+        "timestamp": "2026-03-08 07:59:37",
         "category": "reasoning",
-        "message": "Hybrid Reasoning for: What other helpers could a web search agent have",
+        "message": "Hybrid Reasoning for: hello",
         "details": {
             "reasoning": {
-                "query": "What other helpers could a web search agent have",
+                "query": "hello",
                 "query_type": "general_query",
                 "intent": "fallback",
                 "keywords": [],
@@ -87,7 +21,15 @@
         }
     },
     {
-        "timestamp": "2026-03-08 05:44:57",
+        "timestamp": "2026-03-08 07:59:37",
+        "category": "context",
+        "message": "Context: 365 tokens",
+        "details": {
+            "tokens": 365
+        }
+    },
+    {
+        "timestamp": "2026-03-08 07:59:40",
         "category": "action",
         "message": "Final Answer provided",
         "details": {
@@ -95,246 +37,885 @@
         }
     },
     {
-        "timestamp": "2026-03-08 05:45:23",
+        "timestamp": "2026-03-08 08:01:38",
         "category": "info",
         "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
         "details": {}
     },
     {
-        "timestamp": "2026-03-08 05:45:23",
+        "timestamp": "2026-03-08 08:01:38",
         "category": "info",
-        "message": "Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback.",
+        "message": "Agent is thinking...",
         "details": {}
     },
     {
-        "timestamp": "2026-03-08 07:02:58",
+        "timestamp": "2026-03-08 08:01:38",
+        "category": "info",
+        "message": "Snapshot created: 20260308_080138_785117",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:01:44",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: Hello, who are you?",
+        "details": {
+            "reasoning": {
+                "query": "Hello, who are you?",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "HTTP Error 500: Internal Server Error"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "HTTP Error 500: Internal Server Error"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:01:47",
+        "category": "action",
+        "message": "Final Answer provided",
+        "details": {
+            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:02:45",
         "category": "info",
         "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
         "details": {}
     },
     {
-        "timestamp": "2026-03-08 07:02:58",
+        "timestamp": "2026-03-08 08:02:45",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:02:45",
+        "category": "info",
+        "message": "Snapshot created: 20260308_080245_517086",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:02:51",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: What is the capital of France?",
+        "details": {
+            "reasoning": {
+                "query": "What is the capital of France?",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "HTTP Error 500: Internal Server Error"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "HTTP Error 500: Internal Server Error"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:02:54",
+        "category": "action",
+        "message": "Final Answer provided",
+        "details": {
+            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:05:09",
+        "category": "info",
+        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:05:09",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:05:09",
+        "category": "info",
+        "message": "Snapshot created: 20260308_080509_948661",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:05:16",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: Explain quantum computing simply",
+        "details": {
+            "reasoning": {
+                "query": "Explain quantum computing simply",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "HTTP Error 500: Internal Server Error"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "HTTP Error 500: Internal Server Error"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:05:19",
+        "category": "action",
+        "message": "Final Answer provided",
+        "details": {
+            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:07:36",
+        "category": "info",
+        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:07:36",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:07:36",
+        "category": "info",
+        "message": "Snapshot created: 20260308_080736_590364",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:07:42",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: Who are you?",
+        "details": {
+            "reasoning": {
+                "query": "Who are you?",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "HTTP Error 500: Internal Server Error"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "HTTP Error 500: Internal Server Error"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:07:46",
+        "category": "action",
+        "message": "Final Answer provided",
+        "details": {
+            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:08:34",
+        "category": "info",
+        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:08:34",
         "category": "info",
         "message": "Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback.",
         "details": {}
     },
     {
-        "timestamp": "2026-03-08 07:03:59",
+        "timestamp": "2026-03-08 08:08:40",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:08:40",
+        "category": "info",
+        "message": "Snapshot created: 20260308_080840_625324",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:08:46",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: hello",
+        "details": {
+            "reasoning": {
+                "query": "hello",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "HTTP Error 500: Internal Server Error"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "HTTP Error 500: Internal Server Error"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:08:49",
+        "category": "action",
+        "message": "Final Answer provided",
+        "details": {
+            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:10:32",
+        "category": "info",
+        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:10:32",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:10:32",
+        "category": "info",
+        "message": "Snapshot created: 20260308_081032_245868",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:10:38",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: query",
+        "details": {
+            "reasoning": {
+                "query": "query",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "HTTP Error 500: Internal Server Error"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "HTTP Error 500: Internal Server Error"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:10:41",
+        "category": "action",
+        "message": "Final Answer provided",
+        "details": {
+            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:11:14",
+        "category": "info",
+        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:11:14",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:11:14",
+        "category": "info",
+        "message": "Snapshot created: 20260308_081114_870175",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:11:20",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: query",
+        "details": {
+            "reasoning": {
+                "query": "query",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "HTTP Error 500: Internal Server Error"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "HTTP Error 500: Internal Server Error"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:11:23",
+        "category": "action",
+        "message": "Final Answer provided",
+        "details": {
+            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:12:38",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:12:38",
+        "category": "info",
+        "message": "Snapshot created: 20260308_081238_161227",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:12:43",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: hello",
+        "details": {
+            "reasoning": {
+                "query": "hello",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "HTTP Error 500: Internal Server Error"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "HTTP Error 500: Internal Server Error"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:12:46",
+        "category": "action",
+        "message": "Final Answer provided",
+        "details": {
+            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:14:56",
+        "category": "info",
+        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:14:56",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:14:56",
+        "category": "info",
+        "message": "Snapshot created: 20260308_081456_849026",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:15:02",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: Hello, are you fixed?",
+        "details": {
+            "reasoning": {
+                "query": "Hello, are you fixed?",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "HTTP Error 500: Internal Server Error"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "HTTP Error 500: Internal Server Error"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:15:05",
+        "category": "action",
+        "message": "Final Answer provided",
+        "details": {
+            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:15:55",
+        "category": "info",
+        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:15:55",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:15:56",
+        "category": "info",
+        "message": "Snapshot created: 20260308_081556_002410",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:16:01",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: query",
+        "details": {
+            "reasoning": {
+                "query": "query",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "HTTP Error 500: Internal Server Error"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "HTTP Error 500: Internal Server Error"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:16:04",
+        "category": "action",
+        "message": "Final Answer provided",
+        "details": {
+            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:17:45",
+        "category": "info",
+        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:17:45",
+        "category": "info",
+        "message": "Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback.",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:18:09",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:18:09",
+        "category": "info",
+        "message": "Snapshot created: 20260308_081809_833996",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:18:15",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: help",
+        "details": {
+            "reasoning": {
+                "query": "help",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "HTTP Error 500: Internal Server Error"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "HTTP Error 500: Internal Server Error"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:18:18",
+        "category": "action",
+        "message": "Final Answer provided",
+        "details": {
+            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:19:24",
+        "category": "info",
+        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:19:24",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:19:24",
+        "category": "info",
+        "message": "Snapshot created: 20260308_081924_397824",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:20:24",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: Test",
+        "details": {
+            "reasoning": {
+                "query": "Test",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "timed out"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "timed out"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:24:47",
+        "category": "info",
+        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:24:47",
+        "category": "info",
+        "message": "Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback.",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:24:51",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:24:51",
+        "category": "info",
+        "message": "Snapshot created: 20260308_082451_410619",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:25:51",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: hi",
+        "details": {
+            "reasoning": {
+                "query": "hi",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "timed out"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "timed out"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:27:52",
+        "category": "action",
+        "message": "Final Answer provided",
+        "details": {
+            "text": "Error communicating with Ollama: timed out"
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:27:54",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:27:54",
+        "category": "info",
+        "message": "Snapshot created: 20260308_082754_459825",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:28:54",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: hi",
+        "details": {
+            "reasoning": {
+                "query": "hi",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "timed out"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "timed out"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:30:53",
+        "category": "info",
+        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:30:53",
+        "category": "info",
+        "message": "Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback.",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:30:56",
+        "category": "error",
+        "message": "Unknown command: /model",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:31:00",
         "category": "error",
         "message": "Unknown command: /helo",
         "details": {}
     },
     {
-        "timestamp": "2026-03-08 07:04:16",
+        "timestamp": "2026-03-08 08:31:13",
         "category": "success",
-        "message": "Rolled back to: What other helpers could a web search agent have (2026-03-08T05:44:47.539873)",
+        "message": "Rolled back to: hi (2026-03-08T08:27:54.484883)",
         "details": {}
     },
     {
-        "timestamp": "2026-03-08 07:04:47",
-        "category": "success",
-        "message": "Rolled back to: What other helpers could a web search agent have (2026-03-08T05:44:47.539873)",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 07:05:01",
-        "category": "success",
-        "message": "Rolled back to: What other helpers could a web search agent have (2026-03-08T05:44:47.539873)",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 07:06:11",
-        "category": "info",
-        "message": "Agent is thinking...",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 07:06:11",
-        "category": "info",
-        "message": "Snapshot created: 20260308_070611_343555",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 07:06:17",
-        "category": "reasoning",
-        "message": "Hybrid Reasoning for: fix dashboard in ethub-cli prevent ddos",
-        "details": {
-            "reasoning": {
-                "query": "fix dashboard in ethub-cli prevent ddos",
-                "query_type": "general_query",
-                "intent": "fallback",
-                "keywords": [],
-                "error": "HTTP Error 500: Internal Server Error"
-            },
-            "recommended_actions": {
-                "action": "web_search",
-                "sources": [
-                    "google"
-                ],
-                "error": "HTTP Error 500: Internal Server Error"
-            }
-        }
-    },
-    {
-        "timestamp": "2026-03-08 07:06:17",
-        "category": "context",
-        "message": "Context: 249 tokens",
-        "details": {
-            "tokens": 249
-        }
-    },
-    {
-        "timestamp": "2026-03-08 07:06:20",
-        "category": "action",
-        "message": "Final Answer provided",
-        "details": {
-            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
-        }
-    },
-    {
-        "timestamp": "2026-03-08 07:07:04",
-        "category": "info",
-        "message": "Agent is thinking...",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 07:07:04",
-        "category": "info",
-        "message": "Snapshot created: 20260308_070704_700689",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 07:07:10",
-        "category": "reasoning",
-        "message": "Hybrid Reasoning for: fix dashboard in ethub-cli prevent ddos",
-        "details": {
-            "reasoning": {
-                "query": "fix dashboard in ethub-cli prevent ddos",
-                "query_type": "general_query",
-                "intent": "fallback",
-                "keywords": [],
-                "error": "HTTP Error 500: Internal Server Error"
-            },
-            "recommended_actions": {
-                "action": "web_search",
-                "sources": [
-                    "google"
-                ],
-                "error": "HTTP Error 500: Internal Server Error"
-            }
-        }
-    },
-    {
-        "timestamp": "2026-03-08 07:07:10",
-        "category": "context",
-        "message": "Context: 383 tokens",
-        "details": {
-            "tokens": 383
-        }
-    },
-    {
-        "timestamp": "2026-03-08 07:07:13",
-        "category": "action",
-        "message": "Final Answer provided",
-        "details": {
-            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
-        }
-    },
-    {
-        "timestamp": "2026-03-08 07:09:48",
-        "category": "error",
-        "message": "Usage: /set <key> <value>",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 07:09:53",
-        "category": "error",
-        "message": "Usage: /set <key> <value>",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 07:10:05",
-        "category": "success",
-        "message": "Setting 'ollama' updated to 'qwen2.5:0.5b'",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 07:10:27",
-        "category": "info",
-        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 07:10:27",
-        "category": "info",
-        "message": "Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback.",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 07:10:54",
-        "category": "info",
-        "message": "Agent is thinking...",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 07:10:54",
-        "category": "info",
-        "message": "Snapshot created: 20260308_071054_846171",
-        "details": {}
-    },
-    {
-        "timestamp": "2026-03-08 07:11:01",
-        "category": "reasoning",
-        "message": "Hybrid Reasoning for: prevent dashboard from ddos",
-        "details": {
-            "reasoning": {
-                "query": "prevent dashboard from ddos",
-                "query_type": "general_query",
-                "intent": "fallback",
-                "keywords": [],
-                "error": "HTTP Error 500: Internal Server Error"
-            },
-            "recommended_actions": {
-                "action": "web_search",
-                "sources": [
-                    "google"
-                ],
-                "error": "HTTP Error 500: Internal Server Error"
-            }
-        }
-    },
-    {
-        "timestamp": "2026-03-08 07:11:01",
-        "category": "context",
-        "message": "Context: 244 tokens",
-        "details": {
-            "tokens": 244
-        }
-    },
-    {
-        "timestamp": "2026-03-08 07:11:04",
-        "category": "action",
-        "message": "Final Answer provided",
-        "details": {
-            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
-        }
-    },
-    {
-        "timestamp": "2026-03-08 07:14:10",
+        "timestamp": "2026-03-08 08:31:18",
         "category": "error",
         "message": "Unknown command: /",
         "details": {}
     },
     {
-        "timestamp": "2026-03-08 07:14:14",
-        "category": "error",
-        "message": "Unknown command: /web.",
+        "timestamp": "2026-03-08 08:31:27",
+        "category": "info",
+        "message": "Agent is thinking...",
         "details": {}
     },
     {
-        "timestamp": "2026-03-08 07:15:03",
+        "timestamp": "2026-03-08 08:31:27",
         "category": "info",
-        "message": "Searching for: \"Analyze dashboard web in my folder and change \"",
+        "message": "Snapshot created: 20260308_083127_759315",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:31:27",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: hi",
+        "details": {
+            "reasoning": {
+                "query": "hi",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "<urlopen error [Errno 111] Connection refused>"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "<urlopen error [Errno 111] Connection refused>"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:31:27",
+        "category": "action",
+        "message": "Final Answer provided",
+        "details": {
+            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: <urlopen error [Errno 111] Connection refused>"
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:32:33",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:32:33",
+        "category": "info",
+        "message": "Snapshot created: 20260308_083233_844520",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:33:33",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: hi",
+        "details": {
+            "reasoning": {
+                "query": "hi",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "timed out"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "timed out"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:35:36",
+        "category": "info",
+        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:35:36",
+        "category": "info",
+        "message": "Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback.",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:35:45",
+        "category": "success",
+        "message": "Setting 'model' updated to 'qwen2.5'",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:35:58",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:35:58",
+        "category": "info",
+        "message": "Snapshot created: 20260308_083558_082145",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:36:58",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: hi",
+        "details": {
+            "reasoning": {
+                "query": "hi",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "timed out"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "timed out"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:36:58",
+        "category": "action",
+        "message": "Final Answer provided",
+        "details": {
+            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 404: Not Found"
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:38:51",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:38:51",
+        "category": "info",
+        "message": "Snapshot created: 20260308_083851_386950",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:39:51",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: hi",
+        "details": {
+            "reasoning": {
+                "query": "hi",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "timed out"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "timed out"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:39:51",
+        "category": "action",
+        "message": "Final Answer provided",
+        "details": {
+            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 404: Not Found"
+        }
+    },
+    {
+        "timestamp": "2026-03-08 08:42:10",
+        "category": "info",
+        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:42:10",
+        "category": "info",
+        "message": "Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback.",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:42:14",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-08 08:42:14",
+        "category": "info",
+        "message": "Snapshot created: 20260308_084214_332288",
         "details": {}
     }
 ]

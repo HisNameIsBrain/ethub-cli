@@ -10,8 +10,12 @@ from core.config_engine import ConfigEngine
 class HybridEngine:
     def __init__(self):
         self.config = ConfigEngine()
-        self.reasoner = ReasoningEngine(model=self.config.get("model"))
-        self.actor = ActionEngine(model=self.config.get("model"))
+        model = self.config.get("model")
+        ollama_url = self.config.get("ollama_url")
+        timeout = self.config.get("timeout", 120)
+        
+        self.reasoner = ReasoningEngine(model=model, ollama_url=ollama_url, timeout=timeout)
+        self.actor = ActionEngine(model=model, ollama_url=ollama_url, timeout=timeout)
         self.safety = SafetyEngine()
         self.snapshot = SnapshotEngine()
         self.training_file = "agent-data/training.json"

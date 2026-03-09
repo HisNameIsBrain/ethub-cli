@@ -2,9 +2,10 @@ import urllib.request
 import json
 
 class ActionEngine:
-    def __init__(self, model="qwen2.5:0.5b"):
+    def __init__(self, model="qwen2.5:0.5b", ollama_url="http://127.0.0.1:11434/api/chat", timeout=120):
         self.model = model
-        self.ollama_url = "http://127.0.0.1:11434/api/chat"
+        self.ollama_url = ollama_url
+        self.timeout = timeout
 
     def decide_actions(self, reasoning):
         """Decide what operations to perform based on reasoning via Ollama."""
@@ -17,8 +18,7 @@ class ActionEngine:
                     {'role': 'system', 'content': 'You are the ETHUB Action Engine. Select the best information sources for a query.'},
                     {'role': 'user', 'content': prompt}
                 ],
-                "stream": False,
-                "format": "json"
+                "stream": False
             }
 
             req = urllib.request.Request(
@@ -27,7 +27,7 @@ class ActionEngine:
                 headers={'Content-Type': 'application/json'}
             )
             
-            with urllib.request.urlopen(req, timeout=30) as response:
+            with urllib.request.urlopen(req, timeout=self.timeout) as response:
                 res = json.loads(response.read().decode('utf-8'))
                 raw_content = res['message']['content']
             

@@ -21,7 +21,6 @@ try:
     from core.safety_engine import SafetyEngine
     from core.hybrid_engine import HybridEngine
     from ui.rainbow_animation import run_intro
-    from test_token_counter import TokenCounter
 except ImportError as e:
     print(f"Error importing core components: {e}")
     sys.exit(1)
@@ -32,23 +31,9 @@ helper = HelperEngine()
 snapshot_engine = SnapshotEngine()
 safety_engine = SafetyEngine()
 hybrid_engine = HybridEngine()
-token_counter = TokenCounter()
 
-SYSTEM_PROMPT = """You are an autonomous AI agent with web search capabilities.
-You run in a terminal and must help the user by finding information on the web.
-You have access to the following tools:
-1. "web_search": Searches the internet. Requires argument "query".
-2. "fetch_url": Fetches text content from a specific URL. Requires argument "url".
-3. "final_answer": Provides the final response to the user. Requires argument "text".
-
-You must ALWAYS respond with ONLY a valid JSON object in the following format:
-{
-  "thought": "your reasoning about what to do next",
-  "action": "tool_name",
-  "args": {"arg_name": "arg_value"}
-}
-Do not include any extra text outside the JSON object.
-"""
+SYSTEM_PROMPT = """You are a terminal AI. Reply ONLY in JSON format:
+{"thought": "reasoning", "action": "web_search"|"fetch_url"|"final_answer", "args": {"query": "...", "url": "...", "text": "..."}}"""
 
 class MLStripper(HTMLParser):
     def __init__(self):
@@ -123,8 +108,7 @@ def chat_with_ollama(messages):
     data = {
         "model": model,
         "messages": messages,
-        "stream": False,
-        "format": "json"
+        "stream": False
     }
     try:
         req = urllib.request.Request(ollama_url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type': 'application/json'})
@@ -168,15 +152,8 @@ def run_agent_loop(messages, query=""):
         reasoning, actions = hybrid_engine.process_query(query, messages)
         helper.log_live("reasoning", f"Hybrid Reasoning for: {query}", {"reasoning": reasoning, "recommended_actions": actions})
         
-        # Inject the reasoning into context to guide the agent loop
-        intent_context = f"[Internal Reasoning] Intent: {reasoning.get('intent')}, Keywords: {reasoning.get('keywords')}. Recommended Search Sources: {actions.get('sources')}"
-        messages.append({"role": "system", "content": intent_context})
-        
     while steps < max_steps:
-        # Calculate context usage
-        total_tokens = token_counter.count_messages(messages)
-        helper.log_live("context", f"Context: {total_tokens} tokens", {"tokens": total_tokens})
-        
+        # Chat with Ollama
         response_text = chat_with_ollama(messages)
         messages.append({"role": "assistant", "content": response_text})
         
@@ -187,10 +164,8 @@ def run_agent_loop(messages, query=""):
             args = response_json.get("args", {})
             
             if thought:
-                # Log thought to web with detail, keep CLI simple
-                text = f"\x1b[90mThought: {thought[:100]}...\x1b[0m"
-                print(text)
-                helper.log_console(text)
+                # Minimal CLI thought
+                print(f"\x1b[90mThought: {thought[:50]}...\x1b[0m")
                 helper.log_live("thought", "Agent is thinking...", {"thought": thought})
                 
             if action == "final_answer":
@@ -202,17 +177,14 @@ def run_agent_loop(messages, query=""):
             elif action == "web_search":
                 search_query = args.get('query', '')
                 helper.log_live("action", f"Searching: {search_query}", {"query": search_query})
-                text = f"\x1b[33m[*] Searching the web...\x1b[0m"
-                print(text)
-                helper.log_console(text)
+                print(f"\x1b[33m[*] Searching the web...\x1b[0m")
                 result = web_search(search_query)
                 messages.append({"role": "user", "content": f"Search Results for '{search_query}':\n{result}"})
             elif action == "fetch_url":
                 url = args.get('url', '')
-                helper.log_live("action", f"Fetching: {url}", {"url": url})
-                text = f"\x1b[33m[*] Fetching remote content...\x1b[0m"
-                print(text)
-                helper.log_console(text)
+                # Detailed log for web including path
+                helper.log_live("action", f"Fetching: {url}", {"url": url, "source_path": os.path.abspath(__file__)})
+                print(f"\x1b[33m[*] Fetching remote content...\x1b[0m")
                 result = fetch_url(url, query)
                 messages.append({"role": "user", "content": f"Content of {url}:\n{result}"})
             else:
@@ -244,7 +216,7 @@ def handle_command(cmd_input, messages):
             "/train cmd  - Manage training data (add, list, clear, import)\n"
             "/rollback   - Rollback to previous state (Tab key triggers this)\n"
             "/web cmd    - Web Dashboard (start, stop)\n"
-            "/ollama cmd - Help for Ollama"
+            "/ollama cmd - Manage Ollama (status, pull)"
         )
         print(helper.format_box(help_text, title="Commands"))
     elif cmd == "/clear":
@@ -387,20 +359,34 @@ def handle_command(cmd_input, messages):
         else:
             helper.print_error("Usage: /web [start|stop] [port]")
     elif cmd == "/ollama":
-        if len(parts) > 1 and parts[1] == "pull":
-            model = parts[2] if len(parts) > 2 else config.get("model")
-            helper.print_info(f"Attempting to pull model: {model}")
-            # Ollama pull implementation via urllib
-            ollama_url = config.get("ollama_url").replace("/chat", "/pull")
-            try:
-                data = json.dumps({"name": model}).encode('utf-8')
-                req = urllib.request.Request(ollama_url, data=data)
-                with urllib.request.urlopen(req) as response:
-                    print("Pulling started... (check Ollama server logs for progress)")
-            except Exception as e:
-                helper.print_error(f"Ollama pull failed: {e}")
+        if len(parts) > 1:
+            sub_cmd = parts[1].lower()
+            if sub_cmd == "pull":
+                model = parts[2] if len(parts) > 2 else config.get("model")
+                helper.print_info(f"Attempting to pull model: {model}")
+                # Ollama pull implementation via urllib
+                ollama_url = config.get("ollama_url").replace("/chat", "/pull")
+                try:
+                    data = json.dumps({"name": model}).encode('utf-8')
+                    req = urllib.request.Request(ollama_url, data=data)
+                    with urllib.request.urlopen(req) as response:
+                        print("Pulling started... (check Ollama server logs for progress)")
+                except Exception as e:
+                    helper.print_error(f"Ollama pull failed: {e}")
+            elif sub_cmd == "status":
+                ollama_url = config.get("ollama_url").replace("/api/chat", "/api/tags")
+                try:
+                    with urllib.request.urlopen(ollama_url, timeout=5) as response:
+                        data = json.loads(response.read().decode('utf-8'))
+                        models = [m['name'] for m in data.get('models', [])]
+                        status_text = f"Ollama Server: ONLINE\nAvailable Models: {', '.join(models)}\nConfigured Model: {config.get('model')}"
+                        print(helper.format_box(status_text, title="Ollama Status"))
+                except Exception as e:
+                    helper.print_error(f"Ollama connection failed: {e}")
+            else:
+                helper.print_info("Ollama Commands: /ollama [pull|status]")
         else:
-            helper.print_info("Ollama Commands: /ollama pull [model]")
+            helper.print_info("Ollama Commands: /ollama [pull|status]")
     else:
         helper.print_error(f"Unknown command: {cmd}")
     return None

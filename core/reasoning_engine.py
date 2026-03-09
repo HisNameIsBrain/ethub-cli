@@ -3,11 +3,10 @@ import urllib.request
 import os
 
 class ReasoningEngine:
-    def __init__(self, model="qwen2.5:0.5b"):
+    def __init__(self, model="qwen2.5:0.5b", ollama_url="http://127.0.0.1:11434/api/chat", timeout=120):
         self.model = model
-        # Import config to get URL, but avoid circular import if possible
-        # We'll default to the standard Ollama local URL
-        self.ollama_url = "http://127.0.0.1:11434/api/chat"
+        self.ollama_url = ollama_url
+        self.timeout = timeout
 
     def analyze(self, query):
         """Uses local Ollama via urllib to classify the intent of the ETHUB request."""
@@ -21,8 +20,7 @@ class ReasoningEngine:
                     },
                     {'role': 'user', 'content': query}
                 ],
-                "stream": False,
-                "format": "json"
+                "stream": False
             }
             
             req = urllib.request.Request(
@@ -31,7 +29,7 @@ class ReasoningEngine:
                 headers={'Content-Type': 'application/json'}
             )
             
-            with urllib.request.urlopen(req, timeout=30) as response:
+            with urllib.request.urlopen(req, timeout=self.timeout) as response:
                 res = json.loads(response.read().decode('utf-8'))
                 raw_content = res['message']['content']
             
