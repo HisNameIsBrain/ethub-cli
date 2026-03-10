@@ -123,10 +123,5 @@
         "timestamp": "2026-03-09 20:32:47",
         "query": "ollama serve",
         "return_id": "20260309_203247"
-    },
-    {
-        "timestamp": "2026-03-09 20:33:34",
-        "query": "hi",
-        "return_id": "20260309_203334"
     }
 ]

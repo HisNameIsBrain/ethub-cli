@@ -366,5 +366,58 @@
         "details": {
             "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: <urlopen error [Errno 111] Connection refused>"
         }
+    },
+    {
+        "timestamp": "2026-03-09 20:33:31",
+        "category": "info",
+        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-09 20:33:31",
+        "category": "info",
+        "message": "Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback.",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-09 20:33:34",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-09 20:33:34",
+        "category": "info",
+        "message": "Return point captured: 20260309_203334",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-09 20:33:34",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: hi",
+        "details": {
+            "reasoning": {
+                "query": "hi",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "<urlopen error [Errno 111] Connection refused>"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "<urlopen error [Errno 111] Connection refused>"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-09 20:33:34",
+        "category": "action",
+        "message": "Final Answer provided",
+        "details": {
+            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: <urlopen error [Errno 111] Connection refused>"
+        }
     }
 ]
