@@ -325,5 +325,46 @@
         "details": {
             "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: <urlopen error [Errno 111] Connection refused>"
         }
+    },
+    {
+        "timestamp": "2026-03-09 20:32:47",
+        "category": "info",
+        "message": "Agent is thinking...",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-09 20:32:47",
+        "category": "info",
+        "message": "Return point captured: 20260309_203247",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-09 20:32:47",
+        "category": "reasoning",
+        "message": "Hybrid Reasoning for: ollama serve",
+        "details": {
+            "reasoning": {
+                "query": "ollama serve",
+                "query_type": "general_query",
+                "intent": "fallback",
+                "keywords": [],
+                "error": "<urlopen error [Errno 111] Connection refused>"
+            },
+            "recommended_actions": {
+                "action": "web_search",
+                "sources": [
+                    "google"
+                ],
+                "error": "<urlopen error [Errno 111] Connection refused>"
+            }
+        }
+    },
+    {
+        "timestamp": "2026-03-09 20:32:47",
+        "category": "action",
+        "message": "Final Answer provided",
+        "details": {
+            "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: <urlopen error [Errno 111] Connection refused>"
+        }
     }
 ]
