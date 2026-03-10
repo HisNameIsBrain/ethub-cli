@@ -11,11 +11,16 @@ class ConfigEngine:
         "theme": "rainbow",
         "search_engines": ["google", "github", "wiki", "stackoverflow"],
         "is_mothership": True,
-        "mothership_ip": "127.0.0.1",
+        "mothership_ip": "64.227.103.51",
+        "private_ip": "10.124.0.2",
         "private_gateway": True,
         "sync_enabled": True,
         "cluster_mode": "off",
-        "resource_contribution": 0.1,
+        "power_link": {
+            "enabled": False,
+            "gpu_percent": 0.1,
+            "cpu_percent": 0.1
+        },
         "knowledge_base_access": True
     }
 

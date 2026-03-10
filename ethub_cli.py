@@ -12,6 +12,8 @@ import zipfile
 import io
 import readline
 from html.parser import HTMLParser
+import subprocess # Import subprocess for running external commands
+import shutil # Import shutil for checking executable existence
 
 # Import core engines
 try:
@@ -96,9 +98,12 @@ def web_search(query):
             results = []
             for i in range(min(5, len(snippets), len(links))):
                 text = strip_tags(snippets[i]).strip()
-                results.append(f"Result {i+1}: {text}\nURL: {links[i]}")
+                results.append(f"Result {i+1}: {text}
+URL: {links[i]}")
             
-            return "\n\n".join(results) if results else "No results found."
+            return "
+
+".join(results) if results else "No results found."
     except Exception as e:
         return f"Search failed: {e}"
 
@@ -135,7 +140,9 @@ def ethub_return_action(sub, point_id=None, target=None):
     """Executes a recovery action using the EthubReturnEngine."""
     if sub == "list":
         points = return_engine.list_return_points()
-        return f"[FIELD: RETURN_MANIFEST]\n" + "\n".join(points)
+        return f"[FIELD: RETURN_MANIFEST]
+" + "
+".join(points)
     elif sub == "restore":
         if not point_id: return "Error: 'point_id' required for restore."
         return return_engine.restore_to(point_id)
@@ -234,14 +241,22 @@ def run_agent_loop(messages, query=""):
                     
                     is_safe, audit_msg = safety_engine.perform_surgical_audit(cmd_val, patch_val)
                     if not is_safe:
-                        text += f"\n\n### [FIELD: AUDIT]\nCRITICAL: {audit_msg}\nPROCEED WITH CAUTION."
+                        text += f"
+
+### [FIELD: AUDIT]
+CRITICAL: {audit_msg}
+PROCEED WITH CAUTION."
                         helper.print_warning(f"Audit Warning: {audit_msg}")
                     else:
-                        audit_info = f"\n\n### [FIELD: AUDIT]\n{audit_msg}"
+                        audit_info = f"
+
+### [FIELD: AUDIT]
+{audit_msg}"
                         text += audit_info
                 
                 helper.log_live("action", "Final Answer provided", {"text": text})
-                print(f"\n\x1b[36mAgent:\x1b[0m {text}")
+                print(f"
+\x1b[36mAgent:\x1b[0m {text}")
                 helper.log_console(f"Agent: {text}")
                 break
             elif action == "web_search":
@@ -251,7 +266,8 @@ def run_agent_loop(messages, query=""):
                 print(text)
                 helper.log_console(text)
                 result = web_search(search_query)
-                messages.append({"role": "user", "content": f"Search Results for '{search_query}':\n{result}"})
+                messages.append({"role": "user", "content": f"Search Results for '{search_query}':
+{result}"})
             elif action == "fetch_url":
                 url = args.get('url', '')
                 helper.log_live("action", f"Fetching: {url}", {"url": url})
@@ -259,7 +275,8 @@ def run_agent_loop(messages, query=""):
                 print(text)
                 helper.log_console(text)
                 result = fetch_url(url, query)
-                messages.append({"role": "user", "content": f"Content of {url}:\n{result}"})
+                messages.append({"role": "user", "content": f"Content of {url}:
+{result}"})
             elif action == "research_topic":
                 topic = args.get('topic', '')
                 helper.log_live("action", f"Researching: {topic}", {"topic": topic})
@@ -279,7 +296,8 @@ def run_agent_loop(messages, query=""):
 
                 # Convert the result dict to a readable string for the agent's context.
                 formatted_result = json.dumps(result, indent=2)
-                messages.append({"role": "user", "content": f"Research Results:\n{formatted_result}"})
+                messages.append({"role": "user", "content": f"Research Results:
+{formatted_result}"})
             elif action == "ethub_return":
                 sub = args.get('sub', '')
                 point_id = args.get('point_id', '')
@@ -289,7 +307,8 @@ def run_agent_loop(messages, query=""):
                 print(text)
                 helper.log_console(text)
                 result = ethub_return_action(sub, point_id, target)
-                messages.append({"role": "user", "content": f"Result of recovery {sub}:\n{result}"})
+                messages.append({"role": "user", "content": f"Result of recovery {sub}:
+{result}"})
             else:
                 messages.append({"role": "user", "content": f"Unknown action: {action}. Please use web_search, fetch_url, ethub_action, ethub_return, or final_answer."})
         except json.JSONDecodeError:
@@ -309,19 +328,96 @@ def handle_command(cmd_input, messages):
         return "exit"
     elif cmd == "/help":
         help_text = (
-            "/help       - Show this help\n"
-            "/exit       - Exit interactive mode\n"
-            "/clear      - Clear the screen\n"
-            "/settings   - View current settings\n"
-            "/set k v    - Update a setting (e.g., /set model llama3)\n"
-            "/search q   - Perform a manual web search\n"
-            "/sysinfo    - Show system information\n"
-            "/train cmd  - Manage training data (add, list, clear, import)\n"
-            "/return cmd - System Recovery (list, <point_id>)\n"
-            "/web cmd    - Web Dashboard (start, stop)\n"
+            "/help       - Show this help
+"
+            "/exit       - Exit interactive mode
+"
+            "/clear      - Clear the screen
+"
+            "/settings   - View current settings
+"
+            "/set k v    - Update a setting (e.g., /set model llama3)
+"
+            "/search q   - Perform a manual web search
+"
+            "/sysinfo    - Show system information
+"
+            "/train cmd  - Manage training data (add, list, clear, import)
+"
+            "/return cmd - System Recovery (list, <point_id>)
+"
+            "/web cmd    - Web Dashboard (start, stop)
+"
+            "/cluster    - Manage cluster mode and resource sharing
+"
+            "/powerlink  - Configure resource contribution (gpu/cpu %)
+"
+            "/sync       - Manually sync snapshots and logs to mothership
+"
             "/ollama cmd - Help for Ollama"
         )
         print(helper.format_box(help_text, title="ETHUB SURGICAL COMMANDS"))
+    elif cmd == "/powerlink":
+        from core.config_engine import ConfigEngine
+        config = ConfigEngine()
+        pl = config.get("power_link", {"enabled": False, "gpu_percent": 0.1, "cpu_percent": 0.1})
+        if len(parts) > 1:
+            sub = parts[1].lower()
+            if sub == "on":
+                pl["enabled"] = True
+                helper.print_success("Power Link enabled.")
+            elif sub == "off":
+                pl["enabled"] = False
+                helper.print_success("Power Link disabled.")
+            elif sub == "set":
+                if len(parts) > 3:
+                    type_ = parts[2].lower()
+                    val = float(parts[3])
+                    if type_ == "gpu": pl["gpu_percent"] = val
+                    elif type_ == "cpu": pl["cpu_percent"] = val
+                    helper.print_success(f"Power Link {type_} updated to {val*100}%")
+            config.set("power_link", pl)
+        else:
+            status = "ENABLED" if pl["enabled"] else "DISABLED"
+            info = f"Status: {status}
+GPU: {pl['gpu_percent']*100}%
+CPU: {pl['cpu_percent']*100}%"
+            print(helper.format_box(info, title="Power Link Status"))
+    elif cmd == "/cluster":
+        from core.config_engine import ConfigEngine
+        config = ConfigEngine()
+        if len(parts) > 1:
+            sub = parts[1].lower()
+            if sub == "on":
+                config.set("cluster_mode", "on")
+                helper.print_success("Cluster mode enabled.")
+            elif sub == "off":
+                config.set("cluster_mode", "off")
+                helper.print_success("Cluster mode disabled.")
+            elif sub == "contribute":
+                if len(parts) > 2:
+                    val = float(parts[2])
+                    config.set("resource_contribution", val)
+                config.set("cluster_mode", "contribute")
+                helper.print_success(f"Cluster contribution enabled at {config.get('resource_contribution')*100}%")
+            else:
+                helper.print_error("Usage: /cluster [on|off|contribute] [value]")
+        else:
+            mode = config.get("cluster_mode")
+            contrib = config.get("resource_contribution")
+            ip = config.get("mothership_ip")
+            is_m = config.get("is_mothership")
+            info = f"Mode: {mode}
+Contribution: {contrib*100}%
+Mothership IP: {ip}
+Is Mothership: {is_m}"
+            print(helper.format_box(info, title="Cluster Status"))
+    elif cmd == "/sync":
+        from core.sync_engine import SyncEngine
+        helper.print_info("Initiating manual sync to mothership...")
+        sync = SyncEngine()
+        sync.sync_to_mothership()
+        helper.print_success("Sync process completed.")
     elif cmd == "/clear":
         helper.clear_screen()
     elif cmd == "/settings":
@@ -371,7 +467,8 @@ def handle_command(cmd_input, messages):
                 if os.path.exists(training_file) and os.path.getsize(training_file) > 0:
                     try:
                         with open(training_file, "r") as f: data = json.load(f)
-                        print(helper.format_box("\n".join([f"{i+1}. {item[:100]}..." for i, item in enumerate(data)]), title="Training Data"))
+                        print(helper.format_box("
+".join([f"{i+1}. {item[:100]}..." for i, item in enumerate(data)]), title="Training Data"))
                     except Exception as e:
                         helper.print_error(f"Error reading training data: {e}")
                 else:
@@ -442,7 +539,8 @@ def handle_command(cmd_input, messages):
             sub = parts[1].lower()
             if sub == "list":
                 points = return_engine.list_return_points()
-                print(helper.format_box("\n".join(points), title="Return Points"))
+                print(helper.format_box("
+".join(points), title="Return Points"))
             else:
                 # Assume it's an ID
                 print(return_engine.restore_to(parts[1]))
@@ -464,34 +562,177 @@ def handle_command(cmd_input, messages):
         else:
             helper.print_error("Usage: /web [start|stop] [port]")
     elif cmd == "/ollama":
-        if len(parts) > 1 and parts[1] == "pull":
-            model = parts[2] if len(parts) > 2 else config.get("model")
-            helper.print_info(f"Attempting to pull model: {model}")
-            # Ollama pull implementation via urllib
-            ollama_url = config.get("ollama_url").replace("/chat", "/pull")
-            try:
-                data = json.dumps({"name": model}).encode('utf-8')
-                req = urllib.request.Request(ollama_url, data=data)
-                with urllib.request.urlopen(req) as response:
-                    print("Pulling started... (check Ollama server logs for progress)")
-            except Exception as e:
-                helper.print_error(f"Ollama pull failed: {e}")
+        ollama_bin_path = "ollama" # Assumes ollama is in PATH
+        
+        if len(parts) > 1:
+            subcommand = parts[1].lower()
+
+            if subcommand == "pull":
+                model = parts[2] if len(parts) > 2 else config.get("model")
+                helper.print_info(f"Attempting to pull model: {model}")
+                # Ollama pull implementation via urllib
+                ollama_url = config.get("ollama_url").replace("/chat", "/pull")
+                try:
+                    data = json.dumps({"name": model}).encode('utf-8')
+                    req = urllib.request.Request(ollama_url, data=data)
+                    with urllib.request.urlopen(req) as response:
+                        print("Pulling started... (check Ollama server logs for progress)")
+                except Exception as e:
+                    helper.print_error(f"Ollama pull failed: {e}")
+            
+            elif subcommand == "serve":
+                # Check if ollama command exists in PATH
+                if not shutil.which(ollama_bin_path):
+                    helper.print_error(f"Ollama executable '{ollama_bin_path}' not found. Please ensure Ollama is installed and in your PATH.")
+                    return
+                
+                helper.print_info("Attempting to start Ollama server...")
+                try:
+                    # Check if Ollama server is already running by trying to connect to /version endpoint
+                    ollama_url_check = config.get("ollama_url").replace("/chat", "/version")
+                    req_check = urllib.request.Request(ollama_url_check, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req_check, timeout=5) as response_check:
+                         if response_check.getcode() == 200:
+                            helper.print_warning("Ollama server appears to be already running.")
+                            return
+                except Exception as e:
+                    # If connection fails, assume server is not running or accessible yet.
+                    # Continue to try starting it.
+                    pass
+
+                try:
+                    # Launch ollama serve in a separate process. 
+                    # We use Popen to avoid blocking the main thread. Detaching is complex and OS-dependent.
+                    # For simplicity, we launch it and inform the user to check its status.
+                    process = subprocess.Popen([ollama_bin_path, "serve"], 
+                                     stdout=subprocess.PIPE, 
+                                     stderr=subprocess.PIPE,
+                                     creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0) # Hide console on Windows
+                    
+                    # Give it a moment to start and then check if it's running
+                    time.sleep(2)
+                    
+                    # Re-check if it started successfully
+                    req_check = urllib.request.Request(ollama_url_check, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req_check, timeout=5) as response_check:
+                         if response_check.getcode() == 200:
+                            helper.print_success("Ollama server started successfully.")
+                         else:
+                            helper.print_error(f"Ollama server started but reported an issue (HTTP {response_check.getcode()}). Check Ollama logs.")
+                except FileNotFoundError:
+                    helper.print_error(f"Ollama executable '{ollama_bin_path}' not found. Please ensure Ollama is installed and in your PATH.")
+                except Exception as e:
+                    helper.print_error(f"Failed to start Ollama server: {e}")
+
+            elif subcommand == "list":
+                ollama_url = config.get("ollama_url").replace("/chat", "/tags")
+                try:
+                    req = urllib.request.Request(ollama_url, headers={'User-Agent': 'Mozilla/5.0'})
+                    timeout = config.get("timeout", 120)
+                    with urllib.request.urlopen(req, timeout=timeout) as response:
+                        data = json.loads(response.read().decode('utf-8'))
+                        models = data.get("models", [])
+                        if models:
+                            model_list = []
+                            for model_info in models:
+                                model_name = model_info.get("name", "N/A")
+                                model_digest = model_info.get("digest", "N/A")
+                                model_size = model_info.get("size", "N/A")
+                                model_details = model_info.get("details", {})
+                                model_quantization = model_details.get("quantization", "N/A")
+                                model_list.append(f"- {model_name} (Digest: {model_digest[:12]}..., Size: {model_size/1024**2:.2f} MB, Quantization: {model_quantization})")
+                            print(helper.format_box("
+".join(model_list), title="Ollama Models"))
+                        else:
+                            helper.print_info("No Ollama models found. Try pulling a model first.")
+                except Exception as e:
+                    helper.print_error(f"Failed to list Ollama models: {e}. Is the Ollama server running?")
+
+            elif subcommand == "model":
+                if len(parts) > 2:
+                    new_model = parts[2]
+                    # Check if the model is valid by attempting a quick info fetch (optional but good practice)
+                    # For simplicity, we'll just set it and let Ollama fail later if invalid.
+                    config.set("model", new_model)
+                    helper.print_success(f"Default Ollama model set to: {new_model}")
+                else:
+                    current_model = config.get("model")
+                    helper.print_info(f"Current default Ollama model is: {current_model}")
+                    helper.print_error("Usage: /ollama model <model_name>")
+            
+            else:
+                help_text = (
+                    "/ollama pull [model_name] - Pull a model from Ollama registry.
+"
+                    "                          If model_name is omitted, uses the default model from config.
+"
+                    "/ollama serve             - Start the Ollama server (if not already running).
+"
+                    "/ollama list              - List all models available on the Ollama server.
+"
+                    "/ollama model [name]      - Set the default model for the agent."
+                )
+                print(helper.format_box(help_text, title="Ollama Commands"))
         else:
-            helper.print_info("Ollama Commands: /ollama pull [model]")
+            help_text = (
+                "/ollama pull [model_name] - Pull a model from Ollama registry.
+"
+                "                          If model_name is omitted, uses the default model from config.
+"
+                "/ollama serve             - Start the Ollama server (if not already running).
+"
+                "/ollama list              - List all models available on the Ollama server.
+"
+                "/ollama model [name]      - Set the default model for the agent."
+            )
+            print(helper.format_box(help_text, title="Ollama Commands"))
     else:
         helper.print_error(f"Unknown command: {cmd}")
     return None
 
 def completer(text, state):
     commands = ['/help', '/exit', '/clear', '/settings', '/set', '/search', '/sysinfo', '/train', '/return', '/web', '/ollama']
+    
+    # Add Ollama subcommands to the completer if /ollama is typed
+    if text.startswith('/ollama '):
+        ollama_parts = text.split()
+        if len(ollama_parts) == 2: # User has typed '/ollama' and is looking for subcommands
+            ollama_subcommands = ['pull', 'serve', 'list', 'model']
+            matches = [cmd for cmd in ollama_subcommands if cmd.startswith(ollama_parts[1])]
+            if state < len(matches):
+                return f"/ollama {matches[state]}"
+            return None
+        elif len(ollama_parts) > 2 and ollama_parts[1] == 'model': # User has typed '/ollama model'
+            # For model setting, we can't easily list all available models here without making an API call during completion.
+            # So we'll just provide a placeholder or let the user type freely.
+            # Alternatively, we could try to list models here if the server is running.
+            # For now, let's not try to complete model names.
+            pass # No specific completion for model names here
+
+    # Default command completion
     if not text:
-        # If no text is typed, Tab will suggest /return
+        # If no text is typed, Tab will suggest /return (as per original logic)
+        # This might need adjustment if /ollama should be a primary suggestion
         return "/return" if state == 0 else None
     
     matches = [c for c in commands if c.startswith(text)]
     if state < len(matches):
         return matches[state]
     return None
+
+# Helper to check if a command exists in PATH
+def shutil_which(command):
+    """Shutil.which is available from Python 3.3 onwards. For compatibility, we define it here."""
+    if sys.version_info >= (3, 3):
+        return shutil.which(command)
+    else:
+        # Basic implementation for older Python versions
+        path = os.environ.get("PATH", os.defpath)
+        for dir in path.split(os.pathsep):
+            cmd_path = os.path.join(dir, command)
+            if os.path.isfile(cmd_path) and os.access(cmd_path, os.X_OK):
+                return cmd_path
+        return None
 
 def main():
     parser = argparse.ArgumentParser(description="ETHUB CLI - Advanced Terminal Agent")
@@ -536,7 +777,8 @@ def main():
                 # print("\x1b[H", end="") 
                 
                 status_tag = f"\x1b[90m[WEB]\x1b[0m " if _httpd else ""
-                user_input = input(f"\n{status_tag}\x1b[32mETHUB>\x1b[0m ").strip()
+                user_input = input(f"
+{status_tag}\x1b[32mETHUB>\x1b[0m ").strip()
                 if not user_input:
                     continue
                 
@@ -549,7 +791,8 @@ def main():
                 messages.append({"role": "user", "content": user_input})
                 run_agent_loop(messages, query=user_input)
             except (KeyboardInterrupt, EOFError):
-                print("\nExiting...")
+                print("
+Exiting...")
                 break
     else:
         messages = [

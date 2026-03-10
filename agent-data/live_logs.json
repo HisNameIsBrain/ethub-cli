@@ -325,5 +325,23 @@
         "details": {
             "text": "Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: <urlopen error [Errno 111] Connection refused>"
         }
+    },
+    {
+        "timestamp": "2026-03-10 00:11:34",
+        "category": "info",
+        "message": "ETHUB CLI Agent initialized. Model: qwen2.5:0.5b",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-10 00:11:34",
+        "category": "info",
+        "message": "Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback.",
+        "details": {}
+    },
+    {
+        "timestamp": "2026-03-10 00:11:48",
+        "category": "info",
+        "message": "Attempting to pull model: qwen2.5",
+        "details": {}
     }
 ]

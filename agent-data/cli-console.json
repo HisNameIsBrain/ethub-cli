@@ -1,17 +1,5 @@
 [
     {
-        "timestamp": "2026-03-08 07:10:27",
-        "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
-    },
-    {
-        "timestamp": "2026-03-08 07:10:54",
-        "text": "\u001b[36m[INFO]\u001b[0m Agent is thinking..."
-    },
-    {
-        "timestamp": "2026-03-08 07:10:54",
-        "text": "\u001b[36m[INFO]\u001b[0m Snapshot created: 20260308_071054_846171"
-    },
-    {
         "timestamp": "2026-03-08 07:11:04",
         "text": "Agent: Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: HTTP Error 500: Internal Server Error"
     },
@@ -198,5 +186,17 @@
     {
         "timestamp": "2026-03-09 16:13:38",
         "text": "Agent: Error communicating with Ollama server at http://127.0.0.1:11434/api/chat. Is it running or did it time out? Details: <urlopen error [Errno 111] Connection refused>"
+    },
+    {
+        "timestamp": "2026-03-10 00:11:34",
+        "text": "\u001b[36m[INFO]\u001b[0m ETHUB CLI Agent initialized. Model: qwen2.5:0.5b"
+    },
+    {
+        "timestamp": "2026-03-10 00:11:34",
+        "text": "\u001b[36m[INFO]\u001b[0m Terminal Mode Active. Type '/help' for commands. Press 'Tab' to easily rollback."
+    },
+    {
+        "timestamp": "2026-03-10 00:11:48",
+        "text": "\u001b[36m[INFO]\u001b[0m Attempting to pull model: qwen2.5"
     }
 ]
