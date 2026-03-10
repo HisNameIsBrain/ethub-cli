@@ -65,6 +65,13 @@ class EthubReturnEngine:
         with open(point_dir / "manifest.json", "w") as f:
             json.dump(manifest, f, indent=4)
             
+        # Trigger Sync if enabled
+        try:
+            from core.sync_engine import SyncEngine
+            sync = SyncEngine(self.project_root)
+            sync.sync_to_mothership()
+        except: pass
+            
         return timestamp
 
     def list_return_points(self):

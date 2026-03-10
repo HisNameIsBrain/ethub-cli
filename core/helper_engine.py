@@ -96,13 +96,38 @@ class HelperEngine:
 
     @staticmethod
     def get_system_info():
-        return {
+        info = {
             "os": platform.system(),
             "release": platform.release(),
             "machine": platform.machine(),
+            "processor": platform.processor(),
+            "python_version": platform.python_version(),
             "cwd": os.getcwd(),
-            "terminal_size": list(shutil.get_terminal_size())
+            "terminal_size": list(shutil.get_terminal_size()),
+            "timestamp": HelperEngine.get_timestamp(),
+            "memory": HelperEngine._get_mem_info()
         }
+        
+        # Save to sysinfo.json
+        sysinfo_file = "agent-data/sysinfo.json"
+        os.makedirs(os.path.dirname(sysinfo_file), exist_ok=True)
+        with open(sysinfo_file, "w") as f:
+            json.dump(info, f, indent=4)
+            
+        return info
+
+    @staticmethod
+    def _get_mem_info():
+        try:
+            import psutil
+            mem = psutil.virtual_memory()
+            return {
+                "total": mem.total,
+                "available": mem.available,
+                "percent": mem.percent
+            }
+        except ImportError:
+            return "psutil not installed"
 
     @staticmethod
     def clear_screen():

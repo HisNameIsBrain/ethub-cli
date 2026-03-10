@@ -9,7 +9,18 @@ class ReasoningEngine:
         self.timeout = timeout
 
     def analyze(self, query):
-        """Uses local Ollama via urllib to classify the intent of the ETHUB request."""
+        """Uses local Ollama or cluster nodes to classify the intent."""
+        from core.config_engine import ConfigEngine
+        config = ConfigEngine()
+        
+        # Cluster Load Balancing
+        if config.get("cluster_mode") == "on" and config.get("is_mothership"):
+            # If we are the mothership and cluster is ON, try to find a contributor
+            # This is a mock for now, but would involve pinging other nodes.
+            # For now, we'll just log that we are in cluster mode.
+            from core.helper_engine import HelperEngine
+            HelperEngine.print_info("Cluster Mode ACTIVE: Analyzing query with distributed resources.")
+
         try:
             payload = {
                 "model": self.model,

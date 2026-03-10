@@ -1,28 +1,79 @@
 import webbrowser
 import urllib.parse
+import urllib.request
 import json
 import os
 from datetime import datetime
+from core.config_engine import ConfigEngine
 
 class SearchEngine:
-    def __init__(self, results_file="storage/results.json"):
+    def __init__(self, results_file="agent-data/results.json"):
         self.results_file = results_file
+        self.config = ConfigEngine()
 
     def execute(self, action_details):
-        """Executes the web search action."""
+        """Executes the web search action with mothership KB fallback."""
         query = action_details.get("query")
-        sources = action_details.get("sources", [])
         
+        # 1. Try Mothership Knowledge Base first if enabled
+        if self.config.get("knowledge_base_access"):
+            kb_results = self._query_mothership(query)
+            if kb_results:
+                print(f"Mothership KB hits for: {query}")
+                self._store_results(query, kb_results)
+                return kb_results
+
+        # 2. Fallback to smart web search
+        sources = action_details.get("sources", self.config.get("search_engines", ["google"]))
         results = []
         for engine in sources:
             url = self._get_url(engine, query)
             if url:
                 print(f"Searching {engine} for: {query}")
-                webbrowser.open(url)
+                # We can't use webbrowser in a headless mothership usually, 
+                # but we'll keep it for local user fallback.
+                try:
+                    webbrowser.open(url)
+                except: pass
                 results.append({"engine": engine, "url": url})
         
         self._store_results(query, results)
         return results
+
+    def _query_mothership(self, query):
+        """Queries the mothership IP for knowledge base access."""
+        if self.config.get("is_mothership"):
+            # If we are the mothership, search locally
+            from core.web_server import WebHandler
+            # We can't easily call WebHandler method without an instance, 
+            # so let's implement a standalone local search or just use a dummy for now.
+            return self._local_kb_search(query)
+        
+        mothership_ip = self.config.get("mothership_ip")
+        url = f"http://{mothership_ip}:8080/api/kb"
+        try:
+            req = urllib.request.Request(url, headers={"X-Query": query})
+            with urllib.request.urlopen(req, timeout=5) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except:
+            return None
+
+    def _local_kb_search(self, query):
+        """Local search when acting as mothership."""
+        results = []
+        data_dir = os.path.join(os.getcwd(), "agent-data")
+        for root, dirs, files in os.walk(data_dir):
+            for file in files:
+                if file.endswith(".json") or file.endswith(".txt"):
+                    file_path = os.path.join(root, file)
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            content = f.read()
+                            if query.lower() in content.lower():
+                                results.append({"file": file, "preview": content[:200]})
+                    except: pass
+        return results
+
 
     def _get_url(self, engine, query):
         encoded_query = urllib.parse.quote(query)
