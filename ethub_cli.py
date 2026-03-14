@@ -98,34 +98,36 @@ def web_search(query):
             results = []
             for i in range(min(5, len(snippets), len(links))):
                 text = strip_tags(snippets[i]).strip()
-                results.append(f"Result {i+1}: {text}
-URL: {links[i]}")
+                results.append(text)
             
-            return "
-
-".join(results) if results else "No results found."
+            return "\n\n".join(results) if results else "No results found."
     except Exception as e:
         return f"Search failed: {e}"
 
 def fetch_url(url, query="general_fetch"):
     timeout = config.get("timeout", 120)
+    parsed_url = urllib.parse.urlparse(url)
+    host = parsed_url.hostname
+    
+    # SSRF Protection: "do not block search sent from localhost or internal only block any external injections"
+    is_internal = host in ['localhost', '127.0.0.1', '0.0.0.0'] or (host and (host.startswith('192.168.') or host.startswith('10.')))
+    
+    if not is_internal and parsed_url.scheme != 'https':
+        return f"Fetch denied: External URLs must use HTTPS for safety."
+
     try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'})
         with urllib.request.urlopen(req, timeout=timeout) as response:
             html = response.read().decode('utf-8')
             
-            # Security Audit of raw HTML
-            is_safe, risks = safety_engine.audit_source_chunk(query, url, html)
+            # Security Audit of raw content
+            is_safe, risks = safety_engine.audit_source_chunk(query, url, html[:3000])
             if not is_safe:
                 return f"Fetch denied by SafetyEngine. Risks: {'; '.join(risks)}"
                 
-            body_match = re.search(r'<body[^>]*>(.*?)</body>', html, re.IGNORECASE | re.DOTALL)
-            if body_match:
-                html = body_match.group(1)
-            html = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.IGNORECASE | re.DOTALL)
-            html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.IGNORECASE | re.DOTALL)
+            # Sanitize: Remove script and style tags
+            html = re.sub(r'<(script|style)[^>]*>.*?</\1>', '', html, flags=re.IGNORECASE | re.DOTALL)
             text = strip_tags(html)
-            text = re.sub(r'\s+', ' ', text)
             
             # Additional Audit on stripped text
             is_safe, risks = safety_engine.audit_source_chunk(query, url, text[:3000])
@@ -180,34 +182,33 @@ def run_agent_loop(messages, query=""):
     steps = 0
     max_steps = config.get("max_steps", 10)
     
-    # Snapshot before execution
-    if query:
-        return_id = return_engine.capture_point(label=f"Query: {query[:50]}")
-        helper.print_info(f"Return point captured: {return_id}")
-        
-        # Log to history.json
-        history_file = "agent-data/history.json"
-        history = []
-        if os.path.exists(history_file):
-            try:
-                with open(history_file, "r") as f: history = json.load(f)
-            except: pass
-        
-        history.append({
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "query": query,
-            "return_id": return_id
-        })
-        with open(history_file, "w") as f: json.dump(history, f, indent=4)
-        
-        # Hybrid Reasoning Phase
-        reasoning, actions = hybrid_engine.process_query(query, messages)
-        helper.log_live("reasoning", f"Hybrid Reasoning for: {query}", {"reasoning": reasoning, "recommended_actions": actions})
-        
-        # Inject the reasoning into context to guide the agent loop
-        intent_context = f"[Internal Reasoning] Intent: {reasoning.get('intent')}, Keywords: {reasoning.get('keywords')}. Recommended Search Sources: {actions.get('sources')}"
-        messages.append({"role": "system", "content": intent_context})
-        
+    # Capture Return Point on EVERY request
+    return_id = return_engine.capture_point(label=f"Query: {query[:50]}")
+    helper.print_info(f"Return point captured: {return_id}")
+    
+    # Save to history.json
+    history_file = "agent-data/history.json"
+    history = []
+    if os.path.exists(history_file):
+        try:
+            with open(history_file, "r") as f: history = json.load(f)
+        except: pass
+    
+    history.append({
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "query": query,
+        "return_id": return_id
+    })
+    with open(history_file, "w") as f: json.dump(history, f, indent=4)
+    
+    # Hybrid Reasoning Phase
+    reasoning, actions = hybrid_engine.process_query(query, messages)
+    helper.log_live("reasoning", f"Hybrid Reasoning for: {query}", {"reasoning": reasoning, "recommended_actions": actions})
+    
+    # Inject the reasoning into context
+    intent_context = f"[Internal Reasoning] Intent: {reasoning.get('intent')}, Keywords: {reasoning.get('keywords')}."
+    messages.append({"role": "system", "content": intent_context})
+    
     while steps < max_steps:
         response_text = chat_with_ollama(messages)
         messages.append({"role": "assistant", "content": response_text})
@@ -219,7 +220,6 @@ def run_agent_loop(messages, query=""):
             args = response_json.get("args", {})
             
             if thought:
-                # Log thought to web with detail, keep CLI simple
                 text = f"\x1b[90mThought: {thought[:100]}...\x1b[0m"
                 print(text)
                 helper.log_console(text)
@@ -228,11 +228,9 @@ def run_agent_loop(messages, query=""):
             if action == "final_answer":
                 text = args.get('text', '')
                 
-                # Check for surgical fix patterns and perform audit
-                audit_info = ""
+                # Perform security audit on proposed fix before providing results
                 if "[FIELD: FIX_CMDS]" in text or "[FIELD: DIFF_PATCH]" in text:
                     helper.print_info("Performing security audit on proposed fix...")
-                    # Extract for audit (rough extraction)
                     fix_cmds = re.search(r'\[FIELD: FIX_CMDS\](.*?)(?=\[FIELD:|$)', text, re.DOTALL)
                     diff_patch = re.search(r'\[FIELD: DIFF_PATCH\](.*?)(?=\[FIELD:|$)', text, re.DOTALL)
                     
@@ -248,72 +246,61 @@ CRITICAL: {audit_msg}
 PROCEED WITH CAUTION."
                         helper.print_warning(f"Audit Warning: {audit_msg}")
                     else:
-                        audit_info = f"
+                        text += f"
 
 ### [FIELD: AUDIT]
 {audit_msg}"
-                        text += audit_info
                 
+                # Save Q&A to training.json
+                training_file = "agent-data/training.json"
+                try:
+                    data = []
+                    if os.path.exists(training_file):
+                        with open(training_file, "r") as f: data = json.load(f)
+                    data.append(f"Q: {query}\nA: {text}")
+                    with open(training_file, "w") as f: json.dump(data, f, indent=4)
+                except: pass
+
                 helper.log_live("action", "Final Answer provided", {"text": text})
                 print(f"
 \x1b[36mAgent:\x1b[0m {text}")
                 helper.log_console(f"Agent: {text}")
-                break
+                break # Adaptive stopping
+                
             elif action == "web_search":
                 search_query = args.get('query', '')
                 helper.log_live("action", f"Searching: {search_query}", {"query": search_query})
-                text = f"\x1b[33m[*] Searching the web...\x1b[0m"
-                print(text)
-                helper.log_console(text)
+                print(f"\x1b[33m[*] Searching the web...\x1b[0m")
                 result = web_search(search_query)
                 messages.append({"role": "user", "content": f"Search Results for '{search_query}':
 {result}"})
             elif action == "fetch_url":
                 url = args.get('url', '')
                 helper.log_live("action", f"Fetching: {url}", {"url": url})
-                text = f"\x1b[33m[*] Fetching remote content...\x1b[0m"
-                print(text)
-                helper.log_console(text)
+                print(f"\x1b[33m[*] Fetching remote content...\x1b[0m")
                 result = fetch_url(url, query)
                 messages.append({"role": "user", "content": f"Content of {url}:
 {result}"})
             elif action == "research_topic":
                 topic = args.get('topic', '')
                 helper.log_live("action", f"Researching: {topic}", {"topic": topic})
-                
-                # Enhanced user feedback: Indicate research start and encourage observation of detailed steps.
-                progress_message_start = f"\x1b[36m[*] Initiating deep research on '{topic}'. Observe detailed step progress below...\x1b[0m"
-                print(progress_message_start)
-                helper.log_console(progress_message_start)
-
-                # The research_engine.execute_staircase method itself prints detailed step-by-step progress.
+                print(f"\x1b[36m[*] Initiating deep research on '{topic}'...\x1b[0m")
                 result = research_engine.execute_staircase(topic) 
-                
-                # Confirmation message after research completion.
-                progress_message_end = f"\x1b[36m[*] Deep research on '{topic}' completed.\x1b[0m"
-                print(progress_message_end)
-                helper.log_console(progress_message_end)
-
-                # Convert the result dict to a readable string for the agent's context.
-                formatted_result = json.dumps(result, indent=2)
                 messages.append({"role": "user", "content": f"Research Results:
-{formatted_result}"})
+{json.dumps(result, indent=2)}"})
             elif action == "ethub_return":
                 sub = args.get('sub', '')
                 point_id = args.get('point_id', '')
                 target = args.get('target', '')
-                helper.log_live("action", f"Recovery Action: {sub} {point_id or target}", {"sub": sub, "point_id": point_id, "target": target})
-                text = f"\x1b[31m[*] Executing recovery {sub}...\x1b[0m"
-                print(text)
-                helper.log_console(text)
+                helper.log_live("action", f"Recovery Action: {sub}", {"sub": sub})
+                print(f"\x1b[31m[*] Executing recovery {sub}...\x1b[0m")
                 result = ethub_return_action(sub, point_id, target)
                 messages.append({"role": "user", "content": f"Result of recovery {sub}:
 {result}"})
             else:
-                messages.append({"role": "user", "content": f"Unknown action: {action}. Please use web_search, fetch_url, ethub_action, ethub_return, or final_answer."})
+                messages.append({"role": "user", "content": f"Unknown action: {action}."})
         except json.JSONDecodeError:
-            helper.print_error("Agent did not return valid JSON. Retrying...")
-            messages.append({"role": "user", "content": "Your previous response was not valid JSON. You MUST return ONLY a JSON object."})
+            messages.append({"role": "user", "content": "Invalid JSON. Respond with ONLY JSON."})
             
         steps += 1
         

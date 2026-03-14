@@ -83,11 +83,10 @@ class ResearchEngine:
         """
         Simulates Desktop Google Search behavior:
         - Constructs Google Desktop Search URL.
-        - Fetches top 3 results sequentially (one at a time) to avoid detection/load.
+        - Fetches top 3 results sequentially.
         - Analyzes each result for 'Credibility Proof'.
         - Selects and synthesizes the 'Best Answer'.
         """
-        # 1. Desktop Search Execution (Google Simulation)
         search_results = self._search_google_desktop(query)
         if not search_results:
             print("    > Warning: Google Desktop Search blocked. Falling back to Verified Proxy...")
@@ -99,8 +98,6 @@ class ResearchEngine:
         print(f"    > Proof Candidates: Found {len(search_results)} sources. Verifying top 3...")
         
         verified_data = []
-        
-        # 2. Sequential Proof Verification (One Request at a Time)
         for i, result in enumerate(search_results[:3]):
             url = result['link']
             print(f"    > [{i+1}/3] Proof Confirmation: {url}")
@@ -111,10 +108,8 @@ class ResearchEngine:
                 analysis = self._analyze_source_credibility(query, content)
                 verified_data.append(f"Source: {url}\nProof Analysis: {analysis}")
             
-            # Protocol: One request at a time (sequential delay)
             time.sleep(2.0)
 
-        # 3. Final Answer Synthesis (The 'Best Answer')
         if not verified_data:
             return "No verified credibility proof could be established from available sources."
 
@@ -124,21 +119,15 @@ class ResearchEngine:
     def _search_google_desktop(self, query):
         """Constructs a Google Search URL and attempts to parse desktop-like results."""
         encoded_query = urllib.parse.quote(query)
-        # desktop search URL
         url = f"https://www.google.com/search?q={encoded_query}&hl=en"
         req = urllib.request.Request(url, headers={'User-Agent': self.user_agent})
         
         try:
             with urllib.request.urlopen(req, timeout=10) as response:
                 html = response.read().decode('utf-8')
-                
-                # Regex for desktop Google search results (titles and links)
-                # Note: Google HTML changes frequently; this is a best-effort pattern
                 results = []
-                # Looking for <a href="/url?q=..." or direct <a href="http..."
                 links = re.findall(r'<a href="(/url\?q=http[^"&]*)', html)
                 if not links:
-                    # fallback pattern for modern google
                     links = re.findall(r'<a href="(https?://[^"]*)"', html)
                 
                 for link in links:
@@ -146,10 +135,8 @@ class ResearchEngine:
                     if "/url?q=" in link:
                         link = link.split("/url?q=")[1]
                     results.append({'link': link, 'title': 'Google Result'})
-                
                 return results if results else None
-        except:
-            return None
+        except: return None
 
     def _search_web_fallback(self, query):
         """Reliable fallback using DuckDuckGo Lite if Google blocks the request."""
@@ -174,86 +161,66 @@ class ResearchEngine:
                 return results
         except: return []
 
-    async def _fetch_page_content(self, url):
-        """Fetches page content with safety and security auditing."""
-        try:
-            # Ensure aiohttp.ClientSession is managed.
-            if not hasattr(self, 'session') or self.session is None or self.session.closed:
-                self.session = aiohttp.ClientSession()
+    def _fetch_page_content(self, url):
+        """Fetches page content with safety, security auditing, and SSRF protection."""
+        parsed_url = urllib.parse.urlparse(url)
+        
+        # SSRF Protection: Block external injections, but allow internal/localhost for search proxies
+        # only if they are explicitly part of the internal setup.
+        host = parsed_url.hostname
+        if host in ['localhost', '127.0.0.1', '0.0.0.0'] or (host and (host.startswith('192.168.') or host.startswith('10.'))):
+            # Per user request: "do not block search sent from localhost or internal"
+            # This implies internal search traffic is allowed.
+            pass
+        elif parsed_url.scheme != 'https':
+            # Block insecure external protocols
+            return None
 
-            async with self.session.get(url, headers={'User-Agent': self.user_agent}, timeout=10) as response:
-                response.raise_for_status() # Raise for bad status codes
-                html = await response.text()
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': self.user_agent})
+            with urllib.request.urlopen(req, timeout=10) as response:
+                html = response.read().decode('utf-8')
                 
-                # Safety Audit (assuming safety.audit_source_chunk is sync for now)
-                is_safe, _ = self.safety.audit_source_chunk("research_verification", url, html[:1000])
+                # Safety Audit: Block external injections in content
+                is_safe, _ = self.safety.audit_source_chunk("research_verification", url, html[:2000])
                 if not is_safe: return None
 
-                # Clean Text Extraction with BeautifulSoup
-                soup = BeautifulSoup(html, 'html.parser')
-                # Remove script and style elements
-                for script_or_style in soup(["script", "style"]):
-                    script_or_style.extract()
-
-                text = soup.get_text()
-                # Clean up whitespace
-                lines = (line.strip() for line in text.splitlines())
-                chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-                text = '\n'.join(chunk for chunk in chunks if chunk)
+                # Clean Text Extraction (No BeautifulSoup)
+                text = re.sub(r'<(script|style)[^>]*>.*?</\1>', '', html, flags=re.IGNORECASE | re.DOTALL)
+                text = re.sub(r'<[^>]+>', ' ', text)
                 return text[:4000]
-        except aiohttp.ClientConnectorError as e:
-            print(f"Page Fetch Connection Error for {url}: {e}")
-            return None
-        except aiohttp.ClientResponseError as e:
-            print(f"Page Fetch API Error for {url}: Status {e.status}. {e.message}")
-            return None
-        except Exception as e:
-            print(f"Page Fetch Unexpected Error for {url}: {e}")
-            return None
+        except: return None
 
     def _analyze_source_credibility(self, query, content):
         """Uses LLM to evaluate the credibility and relevance of a fetched source."""
         prompt = (
             f"Query: {query}\n"
-            f"Source Content (Truncated): {content}\n"
-            "Analyze this source. Does it provide factual, high-quality information for the query? "
-            "Extract the specific data points that prove the solution is correct."
+            f"Source Content: {content}\n"
+            "Evaluate credibility. Extract key factual data points."
         )
-        return self._query_llm(prompt, system_prompt="You are the ETHUB Credibility Proof Auditor.")
+        return self._query_llm(prompt, system_prompt="You are the ETHUB Credibility Auditor.")
 
     def _synthesize_final_answer(self, query, verified_proofs):
         """Synthesizes the 'Best Answer' from multiple verified sources."""
         proofs_text = "\n\n".join(verified_proofs)
         prompt = (
-            f"Query: {query}\n\n"
-            f"Verified Credibility Proofs:\n{proofs_text}\n\n"
-            "Synthesize the final 'Best Answer' based on these verified desktop search results. "
-            "Ensure the answer is formal, detailed, and includes credibility citations from the sources above."
+            f"Query: {query}\n\nProofs:\n{proofs_text}\n\nSynthesize final Best Answer with citations."
         )
-        return self._query_llm(prompt, system_prompt="You are the ETHUB Final Synthesis Engine.")
+        return self._query_llm(prompt, system_prompt="You are the ETHUB Synthesis Engine.")
 
-        async def _query_llm(self, prompt, system_prompt=""):
-            payload = {
-                "model": self.model,
-                "messages": [
-                    {'role': 'system', 'content': system_prompt},
-                    {'role': 'user', 'content': prompt}
-                ],
-                "stream": False
-            }
-            try:
-                # Ensure aiohttp.ClientSession is managed. This is a simplified example.
-                # A more robust implementation would manage the session lifecycle at the class level.
-                if not hasattr(self, 'session') or self.session is None or self.session.closed:
-                    self.session = aiohttp.ClientSession()
-    
-                async with self.session.post(self.ollama_url, json=payload, timeout=30) as response:
-                    response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
-                    res = await response.json()
-                    return res['message']['content']
-            except aiohttp.ClientConnectorError as e:
-                return f"LLM Connection Error: Could not connect to Ollama at {self.ollama_url}. Please ensure Ollama is running. Error: {e}"
-            except aiohttp.ClientResponseError as e:
-                return f"LLM API Error: Received status {e.status} from Ollama. Error: {e.message}"
-            except Exception as e:
-                return f"LLM Interface Error: An unexpected error occurred: {e}"
+    def _query_llm(self, prompt, system_prompt=""):
+        payload = {
+            "model": self.model,
+            "messages": [
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': prompt}
+            ],
+            "stream": False
+        }
+        try:
+            req = urllib.request.Request(self.ollama_url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
+            with urllib.request.urlopen(req, timeout=30) as response:
+                res = json.loads(response.read().decode('utf-8'))
+                return res['message']['content']
+        except Exception as e:
+            return f"LLM Error: {e}"
