@@ -138,10 +138,5 @@
         "timestamp": "2026-03-15 06:56:49",
         "query": "sync",
         "return_id": "20260315_065649"
-    },
-    {
-        "timestamp": "2026-03-15 07:01:18",
-        "query": "Error Traceback (most recent call last):\n  File /root/ethub-cli/ethub_cli.py, line 747, in <module>\n    main()\n  File /root/ethub-cli/ethub_cli.py, line 729, in main\n    status = handle_command(user_input, messages)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File /root/ethub-cli/ethub_cli.py, line 527, in handle_command\n    ollama_url = config.get(ollama_url).replace(/chat, /pull)\n                 ^^^^^^\nUnboundLocalError: cannot access local variable 'co",
-        "return_id": "20260315_070118"
     }
 ]

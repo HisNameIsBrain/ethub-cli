@@ -12,8 +12,6 @@ import zipfile
 import io
 import readline
 from html.parser import HTMLParser
-import subprocess # Import subprocess for running external commands
-import shutil # Import shutil for checking executable existence
 
 # Import core engines
 try:
@@ -36,53 +34,36 @@ hybrid_engine = HybridEngine()
 return_engine = EthubReturnEngine()
 research_engine = ResearchEngine(model=config.get("model", "qwen2.5:0.5b"))
 
-SYSTEM_PROMPT = """You are ETHUB, an autonomous AI agent engineered for High-Integrity Verified Intelligence. 
-Your primary directive is to provide accurate, technically grounded, and verified information by leveraging your specialized tools.
+SYSTEM_PROMPT = """You are an autonomous AI agent with web search capabilities.
+You run in a terminal and must help the user by finding information on the web.
+You have access to the following tools:
+1. "web_search": Searches the internet. Requires argument "query".
+2. "fetch_url": Fetches text content from a specific URL.
+3. "research_topic": Performs a deep, verified staircase research on a topic. Requires "topic".
+4. "ethub_return": Performs system recovery actions (list/restore/rollback). Requires "sub" (list/restore/rollback). For "restore", requires "point_id". For "rollback", requires "target" (file name).
+5. "final_answer": Provides the final response to the user. Requires argument "text".
 
-### 🛠️ Operational Tools
-1. "web_search": Primary tool for global information retrieval.
-   - Requires argument "query".
-2. "fetch_url": Deep content extraction from a specific HTTPS URL.
-   - Requires argument "url".
-3. "research_topic": Initiates the "Staircase Research Model" (History -> Prediction -> Global Verification).
-   - Requires argument "topic".
-4. "ethub_return": System recovery and state management.
-   - Requires "sub" (list/restore/rollback). "restore" requires "point_id", "rollback" requires "target".
-5. "final_answer": The final terminal response to the user.
-   - Requires argument "text".
+### 🏗️ Strategic Formatting Hierarchy
+When you process code, debugging information, or errors, you MUST use the following Semantic Labels:
+1. [FIELD: REASON]: Defines the technical "why" behind an error.
+2. [FIELD: FIX_CMDS]: Lists the exact shell instructions required for resolution.
+3. [FIELD: DIFF_PATCH]: Surgical code comparison using unified diff syntax.
+4. [FIELD: SNIPPET]: Direct code fragment relevant to the fix.
+5. [FIELD: AUDIT]: Security audit trail of the proposed fix.
+6. [FIELD: RETURN]: Feedback on restoration or rollback actions.
 
-### 🏗️ Strategic Formatting Hierarchy (MANDATORY in final_answer)
-1. [FIELD: REASON]: The technical "why" behind an error.
-2. [FIELD: FIX_CMDS]: Copy-pasteable shell instructions.
-3. [FIELD: DIFF_PATCH]: Surgical code changes in unified diff syntax.
-4. [FIELD: AUDIT]: Security audit trail of proposed fixes or fetched content.
-5. [FIELD: KEY POINTS]: Bulleted technical findings or facts.
-6. [FIELD: SOLUTION]: Syntax-highlighted code blocks.
+For simple technical questions, use:
+- [FIELD: KEY POINTS]: Bulleted chunks for listing "Key Points" or technical facts.
+- [FIELD: SOLUTION]: Syntax-highlighted code block for the solution.
 
-### 🔍 Search & Verification Protocol
-- **Accuracy First**: Never guess. Use "web_search" followed by "fetch_url" on official docs or GitHub.
-- **Safety Audit**: Every external data chunk or command must be audited. Report this via [FIELD: AUDIT].
-
-### 🤖 Response Format (STRICT)
-You must ALWAYS respond with ONLY a valid JSON object:
+You must ALWAYS respond with ONLY a valid JSON object in the following format:
 {
-  "thought": "Your internal reasoning and strategy",
+  "thought": "your reasoning about what to do next",
   "action": "tool_name",
   "args": {"arg_name": "arg_value"}
 }
+Do not include any extra text outside the JSON object.
 """
-
-class MLStripper(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.reset()
-        self.strict = False
-        self.convert_charrefs= True
-        self.text = []
-    def handle_data(self, d):
-        self.text.append(d)
-    def get_data(self):
-        return ''.join(self.text)
 
 def strip_tags(html):
     s = MLStripper()
@@ -147,7 +128,9 @@ def ethub_return_action(sub, point_id=None, target=None):
     """Executes a recovery action using the EthubReturnEngine."""
     if sub == "list":
         points = return_engine.list_return_points()
-        return f"[FIELD: RETURN_MANIFEST]\n" + "\n".join(points)
+        return f"[FIELD: RETURN_MANIFEST]
+" + "
+".join(points)
     elif sub == "restore":
         if not point_id: return "Error: 'point_id' required for restore."
         return return_engine.restore_to(point_id)
@@ -242,10 +225,17 @@ def run_agent_loop(messages, query=""):
                     
                     is_safe, audit_msg = safety_engine.perform_surgical_audit(cmd_val, patch_val)
                     if not is_safe:
-                        text += f"\n\n### [FIELD: AUDIT]\nCRITICAL: {audit_msg}\nPROCEED WITH CAUTION."
+                        text += f"
+
+### [FIELD: AUDIT]
+CRITICAL: {audit_msg}
+PROCEED WITH CAUTION."
                         helper.print_warning(f"Audit Warning: {audit_msg}")
                     else:
-                        text += f"\n\n### [FIELD: AUDIT]\n{audit_msg}"
+                        text += f"
+
+### [FIELD: AUDIT]
+{audit_msg}"
                 
                 # Save Q&A to training.json
                 training_file = "agent-data/training.json"
@@ -258,7 +248,8 @@ def run_agent_loop(messages, query=""):
                 except: pass
 
                 helper.log_live("action", "Final Answer provided", {"text": text})
-                print(f"\n\x1b[36mAgent:\x1b[0m {text}")
+                print(f"
+\x1b[36mAgent:\x1b[0m {text}")
                 helper.log_console(f"Agent: {text}")
                 break # Adaptive stopping
                 
@@ -267,19 +258,22 @@ def run_agent_loop(messages, query=""):
                 helper.log_live("action", f"Searching: {search_query}", {"query": search_query})
                 print(f"\x1b[33m[*] Searching the web...\x1b[0m")
                 result = web_search(search_query)
-                messages.append({"role": "user", "content": f"Search Results for '{search_query}':\n{result}"})
+                messages.append({"role": "user", "content": f"Search Results for '{search_query}':
+{result}"})
             elif action == "fetch_url":
                 url = args.get('url', '')
                 helper.log_live("action", f"Fetching: {url}", {"url": url})
                 print(f"\x1b[33m[*] Fetching remote content...\x1b[0m")
                 result = fetch_url(url, query)
-                messages.append({"role": "user", "content": f"Content of {url}:\n{result}"})
+                messages.append({"role": "user", "content": f"Content of {url}:
+{result}"})
             elif action == "research_topic":
                 topic = args.get('topic', '')
                 helper.log_live("action", f"Researching: {topic}", {"topic": topic})
                 print(f"\x1b[36m[*] Initiating deep research on '{topic}'...\x1b[0m")
                 result = research_engine.execute_staircase(topic) 
-                messages.append({"role": "user", "content": f"Research Results:\n{json.dumps(result, indent=2)}"})
+                messages.append({"role": "user", "content": f"Research Results:
+{json.dumps(result, indent=2)}"})
             elif action == "ethub_return":
                 sub = args.get('sub', '')
                 point_id = args.get('point_id', '')
@@ -287,7 +281,8 @@ def run_agent_loop(messages, query=""):
                 helper.log_live("action", f"Recovery Action: {sub}", {"sub": sub})
                 print(f"\x1b[31m[*] Executing recovery {sub}...\x1b[0m")
                 result = ethub_return_action(sub, point_id, target)
-                messages.append({"role": "user", "content": f"Result of recovery {sub}:\n{result}"})
+                messages.append({"role": "user", "content": f"Result of recovery {sub}:
+{result}"})
             else:
                 messages.append({"role": "user", "content": f"Unknown action: {action}."})
         except json.JSONDecodeError:
@@ -306,19 +301,32 @@ def handle_command(cmd_input, messages):
         return "exit"
     elif cmd == "/help":
         help_text = (
-            "/help       - Show this help\n"
-            "/exit       - Exit interactive mode\n"
-            "/clear      - Clear the screen\n"
-            "/settings   - View current settings\n"
-            "/set k v    - Update a setting (e.g., /set model llama3)\n"
-            "/search q   - Perform a manual web search\n"
-            "/sysinfo    - Show system information\n"
-            "/train cmd  - Manage training data (add, list, clear, import)\n"
-            "/return cmd - System Recovery (list, <point_id>)\n"
-            "/web cmd    - Web Dashboard (start, stop)\n"
-            "/cluster    - Manage cluster mode and resource sharing\n"
-            "/powerlink  - Configure resource contribution (gpu/cpu %)\n"
-            "/sync       - Manually sync snapshots and logs to mothership\n"
+            "/help       - Show this help
+"
+            "/exit       - Exit interactive mode
+"
+            "/clear      - Clear the screen
+"
+            "/settings   - View current settings
+"
+            "/set k v    - Update a setting (e.g., /set model llama3)
+"
+            "/search q   - Perform a manual web search
+"
+            "/sysinfo    - Show system information
+"
+            "/train cmd  - Manage training data (add, list, clear, import)
+"
+            "/return cmd - System Recovery (list, <point_id>)
+"
+            "/web cmd    - Web Dashboard (start, stop)
+"
+            "/cluster    - Manage cluster mode and resource sharing
+"
+            "/powerlink  - Configure resource contribution (gpu/cpu %)
+"
+            "/sync       - Manually sync snapshots and logs to mothership
+"
             "/ollama cmd - Help for Ollama"
         )
         print(helper.format_box(help_text, title="ETHUB SURGICAL COMMANDS"))
@@ -344,7 +352,9 @@ def handle_command(cmd_input, messages):
             config.set("power_link", pl)
         else:
             status = "ENABLED" if pl["enabled"] else "DISABLED"
-            info = f"Status: {status}\nGPU: {pl['gpu_percent']*100}%\nCPU: {pl['cpu_percent']*100}%"
+            info = f"Status: {status}
+GPU: {pl['gpu_percent']*100}%
+CPU: {pl['cpu_percent']*100}%"
             print(helper.format_box(info, title="Power Link Status"))
     elif cmd == "/cluster":
         from core.config_engine import ConfigEngine
@@ -370,7 +380,10 @@ def handle_command(cmd_input, messages):
             contrib = config.get("resource_contribution")
             ip = config.get("mothership_ip")
             is_m = config.get("is_mothership")
-            info = f"Mode: {mode}\nContribution: {contrib*100}%\nMothership IP: {ip}\nIs Mothership: {is_m}"
+            info = f"Mode: {mode}
+Contribution: {contrib*100}%
+Mothership IP: {ip}
+Is Mothership: {is_m}"
             print(helper.format_box(info, title="Cluster Status"))
     elif cmd == "/sync":
         from core.sync_engine import SyncEngine
@@ -427,7 +440,8 @@ def handle_command(cmd_input, messages):
                 if os.path.exists(training_file) and os.path.getsize(training_file) > 0:
                     try:
                         with open(training_file, "r") as f: data = json.load(f)
-                        print(helper.format_box("\n".join([f"{i+1}. {item[:100]}..." for i, item in enumerate(data)]), title="Training Data"))
+                        print(helper.format_box("
+".join([f"{i+1}. {item[:100]}..." for i, item in enumerate(data)]), title="Training Data"))
                     except Exception as e:
                         helper.print_error(f"Error reading training data: {e}")
                 else:
@@ -498,7 +512,8 @@ def handle_command(cmd_input, messages):
             sub = parts[1].lower()
             if sub == "list":
                 points = return_engine.list_return_points()
-                print(helper.format_box("\n".join(points), title="Return Points"))
+                print(helper.format_box("
+".join(points), title="Return Points"))
             else:
                 # Assume it's an ID
                 print(return_engine.restore_to(parts[1]))
@@ -599,7 +614,8 @@ def handle_command(cmd_input, messages):
                                 model_details = model_info.get("details", {})
                                 model_quantization = model_details.get("quantization", "N/A")
                                 model_list.append(f"- {model_name} (Digest: {model_digest[:12]}..., Size: {model_size/1024**2:.2f} MB, Quantization: {model_quantization})")
-                            print(helper.format_box("\n".join(model_list), title="Ollama Models"))
+                            print(helper.format_box("
+".join(model_list), title="Ollama Models"))
                         else:
                             helper.print_info("No Ollama models found. Try pulling a model first.")
                 except Exception as e:
@@ -619,19 +635,27 @@ def handle_command(cmd_input, messages):
             
             else:
                 help_text = (
-                    "/ollama pull [model_name] - Pull a model from Ollama registry.\n"
-                    "                          If model_name is omitted, uses the default model from config.\n"
-                    "/ollama serve             - Start the Ollama server (if not already running).\n"
-                    "/ollama list              - List all models available on the Ollama server.\n"
+                    "/ollama pull [model_name] - Pull a model from Ollama registry.
+"
+                    "                          If model_name is omitted, uses the default model from config.
+"
+                    "/ollama serve             - Start the Ollama server (if not already running).
+"
+                    "/ollama list              - List all models available on the Ollama server.
+"
                     "/ollama model [name]      - Set the default model for the agent."
                 )
                 print(helper.format_box(help_text, title="Ollama Commands"))
         else:
             help_text = (
-                "/ollama pull [model_name] - Pull a model from Ollama registry.\n"
-                "                          If model_name is omitted, uses the default model from config.\n"
-                "/ollama serve             - Start the Ollama server (if not already running).\n"
-                "/ollama list              - List all models available on the Ollama server.\n"
+                "/ollama pull [model_name] - Pull a model from Ollama registry.
+"
+                "                          If model_name is omitted, uses the default model from config.
+"
+                "/ollama serve             - Start the Ollama server (if not already running).
+"
+                "/ollama list              - List all models available on the Ollama server.
+"
                 "/ollama model [name]      - Set the default model for the agent."
             )
             print(helper.format_box(help_text, title="Ollama Commands"))
@@ -726,7 +750,8 @@ def main():
                 # print("\x1b[H", end="") 
                 
                 status_tag = f"\x1b[90m[WEB]\x1b[0m " if _httpd else ""
-                user_input = input(f"\n{status_tag}\x1b[32mETHUB>\x1b[0m ").strip()
+                user_input = input(f"
+{status_tag}\x1b[32mETHUB>\x1b[0m ").strip()
                 if not user_input:
                     continue
                 
@@ -739,7 +764,8 @@ def main():
                 messages.append({"role": "user", "content": user_input})
                 run_agent_loop(messages, query=user_input)
             except (KeyboardInterrupt, EOFError):
-                print("\nExiting...")
+                print("
+Exiting...")
                 break
     else:
         messages = [

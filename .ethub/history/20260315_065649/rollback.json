@@ -1,0 +1,188 @@
+[
+    {
+        "timestamp": "2026-03-05T19:16:03.448818",
+        "query": "fix react hook bug",
+        "snapshot_id": "20260305_191603_441988",
+        "path": "agent-data/snapshots/20260305_191603_441988"
+    },
+    {
+        "timestamp": "2026-03-05T19:17:24.003041",
+        "query": " ethub-cli I want the animation to run longer",
+        "snapshot_id": "20260305_191723_999047",
+        "path": "agent-data/snapshots/20260305_191723_999047"
+    },
+    {
+        "timestamp": "2026-03-07T23:46:52.664202",
+        "query": "can you make changes in this directory?",
+        "snapshot_id": "20260307_234652_648066",
+        "path": "agent-data/snapshots/20260307_234652_648066"
+    },
+    {
+        "timestamp": "2026-03-08T00:02:16.561421",
+        "query": "Whats ethub cli",
+        "snapshot_id": "20260308_000216_546028",
+        "path": "agent-data/snapshots/20260308_000216_546028"
+    },
+    {
+        "timestamp": "2026-03-08T00:02:42.264348",
+        "query": "Whats ethub cli",
+        "snapshot_id": "20260308_000242_243584",
+        "path": "agent-data/snapshots/20260308_000242_243584"
+    },
+    {
+        "timestamp": "2026-03-08T00:04:39.479393",
+        "query": "stop",
+        "snapshot_id": "20260308_000439_466652",
+        "path": "agent-data/snapshots/20260308_000439_466652"
+    },
+    {
+        "timestamp": "2026-03-08T05:44:47.539873",
+        "query": "What other helpers could a web search agent have",
+        "snapshot_id": "20260308_054447_531142",
+        "path": "agent-data/snapshots/20260308_054447_531142"
+    },
+    {
+        "timestamp": "2026-03-08T07:06:11.353945",
+        "query": "fix dashboard in ethub-cli prevent ddos",
+        "snapshot_id": "20260308_070611_343555",
+        "path": "agent-data/snapshots/20260308_070611_343555"
+    },
+    {
+        "timestamp": "2026-03-08T07:07:04.721999",
+        "query": "fix dashboard in ethub-cli prevent ddos",
+        "snapshot_id": "20260308_070704_700689",
+        "path": "agent-data/snapshots/20260308_070704_700689"
+    },
+    {
+        "timestamp": "2026-03-08T07:10:54.858841",
+        "query": "prevent dashboard from ddos",
+        "snapshot_id": "20260308_071054_846171",
+        "path": "agent-data/snapshots/20260308_071054_846171"
+    },
+    {
+        "timestamp": "2026-03-08T07:57:45.345395",
+        "query": "hello",
+        "snapshot_id": "20260308_075745_321026",
+        "path": "agent-data/snapshots/20260308_075745_321026"
+    },
+    {
+        "timestamp": "2026-03-08T07:59:31.200787",
+        "query": "hello",
+        "snapshot_id": "20260308_075931_186187",
+        "path": "agent-data/snapshots/20260308_075931_186187"
+    },
+    {
+        "timestamp": "2026-03-08T08:01:38.799300",
+        "query": "Hello, who are you?",
+        "snapshot_id": "20260308_080138_785117",
+        "path": "agent-data/snapshots/20260308_080138_785117"
+    },
+    {
+        "timestamp": "2026-03-08T08:02:45.529576",
+        "query": "What is the capital of France?",
+        "snapshot_id": "20260308_080245_517086",
+        "path": "agent-data/snapshots/20260308_080245_517086"
+    },
+    {
+        "timestamp": "2026-03-08T08:05:09.960601",
+        "query": "Explain quantum computing simply",
+        "snapshot_id": "20260308_080509_948661",
+        "path": "agent-data/snapshots/20260308_080509_948661"
+    },
+    {
+        "timestamp": "2026-03-08T08:07:36.615169",
+        "query": "Who are you?",
+        "snapshot_id": "20260308_080736_590364",
+        "path": "agent-data/snapshots/20260308_080736_590364"
+    },
+    {
+        "timestamp": "2026-03-08T08:08:40.643527",
+        "query": "hello",
+        "snapshot_id": "20260308_080840_625324",
+        "path": "agent-data/snapshots/20260308_080840_625324"
+    },
+    {
+        "timestamp": "2026-03-08T08:10:32.261197",
+        "query": "query",
+        "snapshot_id": "20260308_081032_245868",
+        "path": "agent-data/snapshots/20260308_081032_245868"
+    },
+    {
+        "timestamp": "2026-03-08T08:11:14.883071",
+        "query": "query",
+        "snapshot_id": "20260308_081114_870175",
+        "path": "agent-data/snapshots/20260308_081114_870175"
+    },
+    {
+        "timestamp": "2026-03-08T08:12:38.181151",
+        "query": "hello",
+        "snapshot_id": "20260308_081238_161227",
+        "path": "agent-data/snapshots/20260308_081238_161227"
+    },
+    {
+        "timestamp": "2026-03-08T08:14:56.871775",
+        "query": "Hello, are you fixed?",
+        "snapshot_id": "20260308_081456_849026",
+        "path": "agent-data/snapshots/20260308_081456_849026"
+    },
+    {
+        "timestamp": "2026-03-08T08:15:56.019845",
+        "query": "query",
+        "snapshot_id": "20260308_081556_002410",
+        "path": "agent-data/snapshots/20260308_081556_002410"
+    },
+    {
+        "timestamp": "2026-03-08T08:18:09.847156",
+        "query": "help",
+        "snapshot_id": "20260308_081809_833996",
+        "path": "agent-data/snapshots/20260308_081809_833996"
+    },
+    {
+        "timestamp": "2026-03-08T08:19:24.403450",
+        "query": "Test",
+        "snapshot_id": "20260308_081924_397824",
+        "path": "agent-data/snapshots/20260308_081924_397824"
+    },
+    {
+        "timestamp": "2026-03-08T08:24:51.427688",
+        "query": "hi",
+        "snapshot_id": "20260308_082451_410619",
+        "path": "agent-data/snapshots/20260308_082451_410619"
+    },
+    {
+        "timestamp": "2026-03-08T08:27:54.484883",
+        "query": "hi",
+        "snapshot_id": "20260308_082754_459825",
+        "path": "agent-data/snapshots/20260308_082754_459825"
+    },
+    {
+        "timestamp": "2026-03-08T08:31:27.767410",
+        "query": "hi",
+        "snapshot_id": "20260308_083127_759315",
+        "path": "agent-data/snapshots/20260308_083127_759315"
+    },
+    {
+        "timestamp": "2026-03-08T08:32:33.855053",
+        "query": "hi",
+        "snapshot_id": "20260308_083233_844520",
+        "path": "agent-data/snapshots/20260308_083233_844520"
+    },
+    {
+        "timestamp": "2026-03-08T08:35:58.095954",
+        "query": "hi",
+        "snapshot_id": "20260308_083558_082145",
+        "path": "agent-data/snapshots/20260308_083558_082145"
+    },
+    {
+        "timestamp": "2026-03-08T08:38:51.409266",
+        "query": "hi",
+        "snapshot_id": "20260308_083851_386950",
+        "path": "agent-data/snapshots/20260308_083851_386950"
+    },
+    {
+        "timestamp": "2026-03-08T08:42:14.343641",
+        "query": "hi",
+        "snapshot_id": "20260308_084214_332288",
+        "path": "agent-data/snapshots/20260308_084214_332288"
+    }
+]

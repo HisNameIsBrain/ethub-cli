@@ -1,0 +1,12 @@
+{
+    "timestamp": "2026-03-15T06:56:49.299953",
+    "label": "Query: sync",
+    "state_manifest": {
+        "history.json": "f01ea044ecf3fed693e31ab8c33fea5a97485693adc31f621cd79739a65a93ac",
+        "training.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "memory.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "snippets.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "rollback.json": "9146b2367a3b304b246e285fd019f9b7a17406be794976b7516645aa244ac17e"
+    },
+    "id": "20260315_065649"
+}
