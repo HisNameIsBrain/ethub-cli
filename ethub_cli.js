@@ -7,9 +7,93 @@ const readline = require('readline');
 
 const APP_NAME = 'ethub-cli-agent';
 const DEFAULT_OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434/api/chat';
-const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'llama3.1';
+const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:0.5b';
 const LOG_ROOT = path.join(process.cwd(), 'ethub_cli_session_logs');
 const CHANGE_LOG_ROOT = path.join(process.cwd(), 'ethub_cli_change_logs');
+const ETHUB_ASCII = [
+  "oooooooooooo ooooooooooooo ooooo   ooooo ooooo     ooo oooooooooo.",
+  "`888'     `8 8'   888   `8 `888'   `888' `888'     `8' `888'   `Y8b",
+  " 888              888       888     888   888       8   888     888",
+  " 888oooo8         888       888ooooo888   888       8   888oooo888'",
+  " 888              888       888     888   888       8   888    `88b",
+  " 888       o      888       888     888   `88.    .8'   888    .88P",
+  "o888ooooood8     o888o     o888o   o888o    `YbodP'    o888bood8P'"
+];
+const DIVIDER_CHARS = ['━', '─', '═', '╌'];
+const SUGGESTIONS = [
+  'Summarize the last answer in 3 bullets.',
+  'Review this shell command for safety.',
+  'Draft a concise changelog entry.'
+];
+const LEFT_PAD = '  ';
+const HEADER_WIDTH = 76;
+const ANSI_ENABLED = process.stdout.isTTY && !process.env.NO_COLOR;
+const ANSI = {
+  reset: '\x1b[0m',
+  bold: '\x1b[1m',
+  dim: '\x1b[2m',
+  cyan: '\x1b[36m',
+  magenta: '\x1b[35m',
+  yellow: '\x1b[33m',
+  red: '\x1b[31m'
+};
+
+function style(text, ...codes) {
+  if (!ANSI_ENABLED || !codes.length) return String(text);
+  return `${codes.join('')}${text}${ANSI.reset}`;
+}
+
+function rgb(text, r, g, b) {
+  if (!ANSI_ENABLED) return String(text);
+  return `\x1b[38;2;${r};${g};${b}m${text}${ANSI.reset}`;
+}
+
+function hslToRgb(h, s, l) {
+  h /= 360;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => {
+    const k = (n + h * 12) % 12;
+    const c = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(c * 255);
+  };
+  return { r: f(0), g: f(8), b: f(4) };
+}
+
+function rainbowDivider(width, phase) {
+  let out = '';
+  for (let i = 0; i < width; i += 1) {
+    const ch = DIVIDER_CHARS[i % DIVIDER_CHARS.length];
+    const p = (i / width + phase) % 1;
+    const { r, g, b } = hslToRgb(p * 360, 0.6, 0.65);
+    out += rgb(ch, r, g, b);
+  }
+  return out;
+}
+
+function rainbowAsciiLine(line, row, totalRows, frame) {
+  let out = '';
+  const len = Math.max(line.length, 1);
+
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (ch === ' ') {
+      out += ' ';
+      continue;
+    }
+
+    const phase = (i / len + row / totalRows + frame * 0.01) % 1;
+    const { r, g, b } = hslToRgb(phase * 360, 0.6, 0.65);
+
+    let display = ch;
+    if ((ch === 'o' || ch === '8') && (frame + i + row) % 47 === 0) {
+      display = '+';
+    }
+
+    out += rgb(display, r, g, b);
+  }
+
+  return out;
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -168,11 +252,13 @@ class EthubCliAgent {
     this.history = [];
     this.pendingAction = null;
     this.actionMeta = {};
+    this.thinkingTimer = null;
+    this.isClosed = false;
 
     this.rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
-      prompt: 'ethub> '
+      prompt: style('ethub> ', ANSI.bold, ANSI.cyan)
     });
 
     this.logger.writeEvent('config', {
@@ -196,11 +282,17 @@ class EthubCliAgent {
     });
   }
 
-  start() {
-    this.print('ETHUB CLI Agent started. Ollama only, no external dependencies.');
-    this.print(`Session logs: ${this.logger.sessionDir}`);
-    this.print('Type /help for commands.');
-    this.rl.prompt();
+  async start() {
+    if (ANSI_ENABLED && process.stdout.isTTY) {
+      await this.animateHeader(1200, 20);
+    } else {
+      this.drawHeader(0);
+    }
+    this.print(style('ETHUB CLI Agent started. Ollama only, no external dependencies.', ANSI.bold, ANSI.cyan));
+    this.print(style(`Session logs: ${this.logger.sessionDir}`, ANSI.dim));
+    this.print(style('Type /help for commands.', ANSI.yellow));
+    await this.showSuggestions();
+    this.safePrompt();
 
     this.rl.on('line', async (line) => {
       const input = String(line || '').trim();
@@ -219,15 +311,16 @@ class EthubCliAgent {
         }
       } catch (error) {
         const message = error && error.message ? error.message : String(error);
-        this.print(`Error: ${message}`);
+        this.print(`${style('Error:', ANSI.bold, ANSI.red)} ${message}`);
         this.logger.writeEvent('runtime_error', { message, stack: error && error.stack ? error.stack : null });
       }
 
       this.flushState();
-      this.rl.prompt();
+      this.safePrompt();
     });
 
     this.rl.on('close', () => {
+      this.isClosed = true;
       this.logger.writeEvent('session_end', { ended_at: nowIso() });
       process.stdout.write('\nSession closed.\n');
       process.exit(0);
@@ -237,6 +330,103 @@ class EthubCliAgent {
   print(text) {
     process.stdout.write(`${text}\n`);
     this.logger.writeEvent('stdout', { text });
+  }
+
+  safePrompt() {
+    if (this.isClosed) return;
+    try {
+      this.rl.prompt();
+    } catch (error) {
+      const message = error && error.message ? error.message : String(error);
+      if (!/readline was closed/i.test(message)) {
+        throw error;
+      }
+      this.isClosed = true;
+    }
+  }
+
+  printBanner() {
+    for (const line of ETHUB_ASCII) {
+      this.print(style(line, ANSI.magenta));
+    }
+  }
+
+  drawHeader(frame) {
+    const p1 = (frame / 90) % 1;
+    const p3 = (p1 + 0.66) % 1;
+    this.print(LEFT_PAD + rainbowDivider(HEADER_WIDTH, p1));
+    ETHUB_ASCII.forEach((line, row) => {
+      this.print(LEFT_PAD + rainbowAsciiLine(line, row, ETHUB_ASCII.length, frame));
+    });
+    this.print(
+      LEFT_PAD +
+      style(`Mode: CHAT | Model: ${this.model} | Approval: ${this.requireApproval ? 'ON' : 'OFF'}`, ANSI.dim)
+    );
+    this.print(LEFT_PAD + rainbowDivider(HEADER_WIDTH, p3));
+  }
+
+  renderHeaderFrame(frame) {
+    const p1 = (frame / 90) % 1;
+    const p3 = (p1 + 0.66) % 1;
+    const lines = [];
+    lines.push(LEFT_PAD + rainbowDivider(HEADER_WIDTH, p1));
+    ETHUB_ASCII.forEach((line, row) => {
+      lines.push(LEFT_PAD + rainbowAsciiLine(line, row, ETHUB_ASCII.length, frame));
+    });
+    lines.push(
+      LEFT_PAD +
+      style(`Mode: CHAT | Model: ${this.model} | Approval: ${this.requireApproval ? 'ON' : 'OFF'}`, ANSI.dim)
+    );
+    lines.push(LEFT_PAD + rainbowDivider(HEADER_WIDTH, p3));
+    return lines;
+  }
+
+  async animateHeader(durationMs = 1200, fps = 20) {
+    const frameDelay = Math.max(16, Math.floor(1000 / fps));
+    const frames = Math.max(1, Math.floor(durationMs / frameDelay));
+    for (let frame = 0; frame < frames; frame += 1) {
+      const lines = this.renderHeaderFrame(frame);
+      process.stdout.write('\x1b[2J\x1b[H');
+      process.stdout.write(`${lines.join('\n')}\n`);
+      await new Promise((resolve) => setTimeout(resolve, frameDelay));
+    }
+    process.stdout.write('\x1b[2J\x1b[H');
+    this.drawHeader(frames);
+  }
+
+  async showSuggestions() {
+    this.print('');
+    this.print(LEFT_PAD + style('Suggestions (you can just start typing):', ANSI.dim));
+    for (const s of SUGGESTIONS) {
+      let buf = '';
+      for (const ch of s) {
+        buf += ch;
+        process.stdout.write(`\r${LEFT_PAD}${style(`• ${buf}`, ANSI.dim)}`);
+        await new Promise((resolve) => setTimeout(resolve, 12));
+      }
+      process.stdout.write('\n');
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+    this.print('');
+  }
+
+  startThinking() {
+    if (this.thinkingTimer) return;
+    let i = 0;
+    this.thinkingTimer = setInterval(() => {
+      const dots = '.'.repeat(i % 4);
+      process.stdout.write(
+        `\r${LEFT_PAD}${style('Thinking', ANSI.cyan)}${dots.padEnd(3, ' ')}${style(' parsing your request', ANSI.dim)}${' '.repeat(20)}`
+      );
+      i += 1;
+    }, 140);
+  }
+
+  stopThinking() {
+    if (!this.thinkingTimer) return;
+    clearInterval(this.thinkingTimer);
+    this.thinkingTimer = null;
+    process.stdout.write('\n');
   }
 
   async handleCommand(input) {
@@ -421,6 +611,7 @@ class EthubCliAgent {
     let response;
     let raw;
     const started = Date.now();
+    this.startThinking();
 
     try {
       response = await fetch(this.ollamaUrl, {
@@ -431,6 +622,7 @@ class EthubCliAgent {
 
       raw = await response.text();
     } catch (error) {
+      this.stopThinking();
       const message = error && error.message ? error.message : String(error);
       this.logger.writeEvent('action_failure', {
         action_id: action.id,
@@ -446,6 +638,7 @@ class EthubCliAgent {
       this.print(`Ollama request failed: ${message}`);
       return;
     }
+    this.stopThinking();
 
     let parsed;
     try {
@@ -493,4 +686,7 @@ class EthubCliAgent {
 }
 
 const agent = new EthubCliAgent();
-agent.start();
+agent.start().catch((error) => {
+  process.stderr.write(`Fatal startup error: ${error && error.stack ? error.stack : String(error)}\n`);
+  process.exit(1);
+});

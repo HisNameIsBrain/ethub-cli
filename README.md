@@ -19,6 +19,49 @@
 - `web_debug/index.html`: web UI for ETHUB/Codex/docs file viewing.
 - `codex_logs/`: Codex session log artifacts and policy.
 
+## Mermaid Architecture
+```mermaid
+flowchart LR
+    U[User Terminal] --> E[ethub_cli.js]
+    E --> O[Ollama Localhost API 127.0.0.1:11434]
+    E --> EL[ethub_cli_session_logs]
+    E --> EC[ethub_cli_change_logs]
+
+    C[Codex Session I/O] --> CL[codex_logs]
+
+    B[Browser] --> W[web_debug/index_server.mjs]
+    W --> V[web_debug/index.html]
+    W --> EL
+    W --> EC
+    W --> CL
+    W --> D[docs]
+```
+
+## Mermaid Request Flow
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI as ethub_cli.js
+    participant Ollama as Ollama Localhost
+    participant Logs as ETHUB Logs
+    participant Codex as codex_logs
+    participant Web as web_debug
+
+    User->>CLI: prompt / command
+    CLI->>Logs: append events/transcript/state
+    CLI->>Ollama: chat request (local only)
+    Ollama-->>CLI: response
+    CLI->>Logs: append result + summaries
+
+    User->>Codex: codex session input/output
+    Codex->>Codex: append-only session files
+
+    User->>Web: open tokenized URL
+    Web->>Logs: read ETHUB logs
+    Web->>Codex: read codex logs
+    Web-->>User: debug views
+```
+
 ## Run ETHUB CLI
 ```bash
 cd /root/ethub-cli

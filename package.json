@@ -1,0 +1,23 @@
+{
+  "name": "ethub-cli",
+  "version": "1.0.0",
+  "description": "- Codex logging had runner/server tooling paths introduced during iteration. - Debug viewing and session-capture logic were mixed into temporary tooling attempts. - Documentation existed but did not clearly summarize current final state.",
+  "keywords": [
+    "cli",
+    "ethub"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "hisnameisbrain"
+  },
+  "license": "MIT",
+  "author": "HisNameIsBrain",
+  "type": "commonjs",
+  "main": "ethub_cli.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "node ethub_cli.js"
+  }
+}
