@@ -248,7 +248,7 @@ class EthubCliAgent {
     this.logger = new SessionLogger(LOG_ROOT);
     this.model = DEFAULT_MODEL;
     this.ollamaUrl = DEFAULT_OLLAMA_URL;
-    this.requireApproval = true;
+    this.requireApproval = false;
     this.history = [];
     this.pendingAction = null;
     this.actionMeta = {};
@@ -265,7 +265,7 @@ class EthubCliAgent {
       require_approval: this.requireApproval,
       model: this.model,
       ollama_url: this.ollamaUrl,
-      commands: ['/help', '/status', '/model <name>', '/approve on', '/yes', '/no', '/exit']
+      commands: ['/help', '/status', '/model <name>', '/approve changes on|off', '/yes', '/no', '/exit']
     });
 
     this.flushState();
@@ -360,7 +360,7 @@ class EthubCliAgent {
     });
     this.print(
       LEFT_PAD +
-      style(`Mode: CHAT | Model: ${this.model} | Approval: ${this.requireApproval ? 'ON' : 'OFF'}`, ANSI.dim)
+      style(`Mode: CHAT | Model: ${this.model} | Change Approval: ${this.requireApproval ? 'ON' : 'OFF'}`, ANSI.dim)
     );
     this.print(LEFT_PAD + rainbowDivider(HEADER_WIDTH, p3));
   }
@@ -435,7 +435,7 @@ class EthubCliAgent {
     this.logger.writeEvent('subcommand', { command, args });
 
     if (command === '/help') {
-      this.print('Commands: /help, /status, /model <name>, /approve on, /yes, /no, /exit');
+      this.print('Commands: /help, /status, /model <name>, /approve changes on|off, /yes, /no, /exit');
       return;
     }
 
@@ -443,7 +443,7 @@ class EthubCliAgent {
       this.print(safeJson({
         model: this.model,
         ollama_url: this.ollamaUrl,
-        require_approval: this.requireApproval,
+        require_approval_for_changes: this.requireApproval,
         history_count: this.history.length,
         pending_action: this.pendingAction ? this.pendingAction.id : null
       }));
@@ -463,14 +463,30 @@ class EthubCliAgent {
     }
 
     if (command === '/approve') {
-      const mode = (args[0] || '').toLowerCase();
-      if (mode !== 'on') {
-        this.print('Approval is mandatory. Use: /approve on');
+      const target = (args[0] || '').toLowerCase();
+      const mode = (args[1] || '').toLowerCase();
+      const legacyMode = target;
+
+      if (target === 'changes' && (mode === 'on' || mode === 'off')) {
+        this.requireApproval = mode === 'on';
+        this.print(`Change approval mode: ${mode}`);
+        this.logger.writeEvent('config_update', { key: 'require_approval_for_changes', value: this.requireApproval });
         return;
       }
-      this.requireApproval = true;
-      this.print('Approval mode: on');
-      this.logger.writeEvent('config_update', { key: 'require_approval', value: this.requireApproval });
+
+      if (legacyMode === 'on' || legacyMode === 'off') {
+        this.requireApproval = legacyMode === 'on';
+        this.print(`Change approval mode: ${legacyMode}`);
+        this.logger.writeEvent('config_update', { key: 'require_approval_for_changes', value: this.requireApproval });
+        return;
+      }
+
+      if (!target) {
+        this.print(`Change approval mode: ${this.requireApproval ? 'on' : 'off'}`);
+        return;
+      }
+
+      this.print('Usage: /approve changes on|off');
       return;
     }
 
@@ -555,18 +571,11 @@ class EthubCliAgent {
       Diff: '+,-',
       Path: 'path/to/file:line:character',
       action_id: action.id,
-      'Print-approved-by-user?': this.requireApproval ? 'pending' : 'true',
+      'Print-approved-by-user?': 'not_required (run commands)',
       'Run runtime look at logs': 'pending',
       summary: 'pending',
       'Number of characters changed': 'pending'
     });
-
-    if (this.requireApproval) {
-      this.pendingAction = action;
-      this.print(`Pending action ${action.id}: send prompt to Ollama model '${this.model}'.`);
-      this.print('Approve with /yes or reject with /no.');
-      return;
-    }
 
     await this.executeAction(action);
   }

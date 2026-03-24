@@ -1,103 +1,340 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ETHUB web_debug</title>
+<title>ETHUB Dashboard</title>
 <style>
 :root {
-  --bg: #0c1117;
-  --panel: #121925;
-  --line: #263248;
-  --text: #e6edf7;
-  --muted: #8ea0bf;
-  --accent: #29c48a;
+  --bg: #0a1118;
+  --bg-soft: #101a26;
+  --panel: #111b29;
+  --panel-alt: #0d1724;
+  --line: #2a3e5a;
+  --text: #eaf2ff;
+  --muted: #97abc7;
+  --accent: #4ee4aa;
+  --accent-2: #77b6ff;
+  --danger: #ff6b6b;
+  --ok: #2fd48f;
+  --focus: #ffd166;
+  --content-font-size: 14px;
 }
+
+body.high-contrast {
+  --bg: #000;
+  --bg-soft: #090909;
+  --panel: #111;
+  --panel-alt: #000;
+  --line: #fff;
+  --text: #fff;
+  --muted: #ddd;
+  --accent: #00ff8a;
+  --accent-2: #59beff;
+  --focus: #ffea00;
+}
+
 * { box-sizing: border-box; }
-body {
+
+html, body {
   margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  background: radial-gradient(circle at top, #111a2a, #0c1117 45%);
+  padding: 0;
+  background: radial-gradient(circle at 18% 0%, #162538 0%, var(--bg) 55%);
   color: var(--text);
+  font-family: "Segoe UI", "IBM Plex Sans", system-ui, -apple-system, sans-serif;
 }
+
+body.reduce-motion * {
+  transition: none !important;
+  animation: none !important;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
 header {
-  padding: 14px 16px;
   border-bottom: 1px solid var(--line);
-  background: #0f1622;
+  background: linear-gradient(180deg, #101a2a, #0d1724);
+  padding: 14px 16px;
 }
+
+.top-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+
+.badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.online-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--muted);
+  box-shadow: 0 0 0 2px #00000044;
+}
+
+.dot.online {
+  background: var(--ok);
+  box-shadow: 0 0 10px #2fd48f88;
+}
+
+.dot.offline {
+  background: var(--danger);
+  box-shadow: 0 0 10px #ff6b6b66;
+}
+
 main {
   display: grid;
-  grid-template-columns: 340px 1fr;
-  min-height: calc(100vh - 60px);
+  grid-template-columns: 360px 1fr;
+  min-height: calc(100vh - 92px);
 }
+
 aside {
   border-right: 1px solid var(--line);
-  padding: 12px;
-  background: #101725;
-}
-section {
-  padding: 12px;
-}
-label { display: block; margin: 8px 0 6px; color: var(--muted); }
-select, button, input {
-  width: 100%;
-  background: #1a2436;
-  color: var(--text);
-  border: 1px solid #31425f;
-  border-radius: 8px;
-  padding: 8px;
-}
-button { margin-top: 8px; cursor: pointer; }
-button:hover { border-color: var(--accent); }
-pre {
-  white-space: pre-wrap;
-  word-break: break-word;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #0a0f18;
-  padding: 12px;
-  min-height: 72vh;
-  max-height: 72vh;
+  background: linear-gradient(180deg, var(--panel), var(--panel-alt));
+  padding: 14px;
   overflow: auto;
 }
-.meta { color: var(--muted); margin-bottom: 10px; }
-@media (max-width: 900px) {
+
+section {
+  padding: 14px;
+  min-width: 0;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: #0f1a29;
+  margin-bottom: 10px;
+}
+
+.panel h2 {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+}
+
+label {
+  display: block;
+  color: var(--muted);
+  margin: 8px 0 6px;
+  font-size: 0.88rem;
+}
+
+select, input, button {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #385374;
+  background: #17263a;
+  color: var(--text);
+  padding: 9px;
+  font-size: 0.93rem;
+}
+
+button {
+  cursor: pointer;
+  background: linear-gradient(180deg, #1a2d45, #15273f);
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.actions .wide {
+  grid-column: 1 / -1;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.row > label {
+  margin: 0;
+  color: var(--text);
+}
+
+input[type="checkbox"] {
+  width: auto;
+  transform: scale(1.1);
+}
+
+input[type="range"] {
+  width: 100%;
+}
+
+.status {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #0b1522;
+  color: var(--muted);
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+pre {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #070e18;
+  color: var(--text);
+  padding: 14px;
+  overflow: auto;
+  min-height: calc(100vh - 190px);
+  max-height: calc(100vh - 190px);
+  font-family: "IBM Plex Mono", "Consolas", "Menlo", monospace;
+  font-size: var(--content-font-size);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+body.no-wrap pre {
+  white-space: pre;
+  word-break: normal;
+}
+
+.kbd {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1px 6px;
+  background: #122033;
+}
+
+@media (max-width: 1050px) {
   main { grid-template-columns: 1fr; }
   aside { border-right: 0; border-bottom: 1px solid var(--line); }
-  pre { min-height: 50vh; max-height: 50vh; }
+  pre { min-height: 52vh; max-height: 52vh; }
 }
 </style>
 </head>
 <body>
 <header>
-  <strong>ETHUB web_debug</strong>
-  <div class="meta">Local safe server view for ETHUB/Codex/docs logs on port 3000</div>
+  <div class="top-row">
+    <div>
+      <div class="title">ETHUB Dashboard</div>
+      <div class="subtitle">Session explorer for ETHUB, Codex, and docs logs.</div>
+    </div>
+    <div class="badges" aria-label="Live status badges">
+      <div class="badge online-pill" title="Server connectivity">
+        <span id="onlineDot" class="dot"></span>
+        <span id="onlineText">Checking...</span>
+      </div>
+      <div class="badge">Server uptime: <strong id="serverUptime">--</strong></div>
+      <div class="badge">ETHUB session runtime: <strong id="sessionClock">--</strong></div>
+    </div>
+  </div>
 </header>
+
 <main>
-  <aside>
-    <label>Token</label>
-    <input id="token" placeholder="paste token from server startup" />
+  <aside aria-label="Controls">
+    <div class="panel">
+      <h2>Load Data</h2>
+      <label for="token">Token</label>
+      <input id="token" autocomplete="off" spellcheck="false" placeholder="paste token from server startup" />
 
-    <label>Source</label>
-    <select id="source"></select>
+      <label for="source">Source</label>
+      <select id="source"></select>
 
-    <button id="loadSessions">Load Sessions</button>
+      <label for="session">Session / File Group</label>
+      <select id="session"></select>
 
-    <label>Session/File Group</label>
-    <select id="session"></select>
+      <label for="file">File</label>
+      <select id="file"></select>
 
-    <button id="loadFiles">Load Files</button>
+      <div class="actions">
+        <button id="loadSessions" type="button">Load Sessions</button>
+        <button id="loadFiles" type="button">Load Files</button>
+        <button id="openFile" class="wide" type="button">Open Selected File</button>
+        <button id="openLatest" class="wide" type="button">Open Latest Session (ETHUB)</button>
+        <button id="openChat" class="wide" type="button">Open Ollama Chat</button>
+      </div>
+      <div class="subtitle">Tip: <span class="kbd">Alt</span> + <span class="kbd">L</span> opens latest ETHUB session.</div>
+    </div>
 
-    <label>File</label>
-    <select id="file"></select>
+    <div class="panel">
+      <h2>Reading Settings</h2>
 
-    <button id="openFile">Open File</button>
+      <div class="row">
+        <label for="wrapToggle">Line wrap</label>
+        <input id="wrapToggle" type="checkbox" checked />
+      </div>
+
+      <div class="row">
+        <label for="contrastToggle">High contrast</label>
+        <input id="contrastToggle" type="checkbox" />
+      </div>
+
+      <div class="row">
+        <label for="motionToggle">Reduce motion</label>
+        <input id="motionToggle" type="checkbox" />
+      </div>
+
+      <div class="row">
+        <label for="autoRefreshToggle">Auto-refresh open file</label>
+        <input id="autoRefreshToggle" type="checkbox" />
+      </div>
+
+      <label for="fontSize">Text size</label>
+      <input id="fontSize" type="range" min="12" max="24" step="1" value="14" />
+      <div class="subtitle">Current size: <span id="fontSizeValue">14px</span></div>
+    </div>
   </aside>
+
   <section>
-    <div class="meta" id="status">Ready</div>
-    <pre id="content"></pre>
+    <div id="status" class="status" role="status" aria-live="polite">Ready</div>
+    <pre id="content" tabindex="0" aria-label="File content viewer"></pre>
   </section>
 </main>
+
 <script>
 const sourceEl = document.getElementById('source');
 const sessionEl = document.getElementById('session');
@@ -105,19 +342,65 @@ const fileEl = document.getElementById('file');
 const tokenEl = document.getElementById('token');
 const statusEl = document.getElementById('status');
 const contentEl = document.getElementById('content');
+const onlineDotEl = document.getElementById('onlineDot');
+const onlineTextEl = document.getElementById('onlineText');
+const serverUptimeEl = document.getElementById('serverUptime');
+const sessionClockEl = document.getElementById('sessionClock');
+
+const wrapToggleEl = document.getElementById('wrapToggle');
+const contrastToggleEl = document.getElementById('contrastToggle');
+const motionToggleEl = document.getElementById('motionToggle');
+const autoRefreshToggleEl = document.getElementById('autoRefreshToggle');
+const fontSizeEl = document.getElementById('fontSize');
+const fontSizeValueEl = document.getElementById('fontSizeValue');
+
+const state = {
+  currentSource: '',
+  currentSession: '',
+  currentFile: '',
+  sessionStartedAt: null,
+  healthTimer: null,
+  clockTimer: null,
+  autoRefreshTimer: null
+};
 
 function getToken() {
   const p = new URLSearchParams(location.search).get('token');
   return tokenEl.value || p || '';
 }
 
-function setStatus(msg) { statusEl.textContent = msg; }
+function formatDuration(ms) {
+  if (ms == null || Number.isNaN(ms)) return '--';
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
 
-async function api(path) {
+function setStatus(msg) {
+  statusEl.textContent = msg;
+}
+
+function setOnline(ok, text) {
+  onlineDotEl.classList.remove('online', 'offline');
+  onlineDotEl.classList.add(ok ? 'online' : 'offline');
+  onlineTextEl.textContent = text;
+}
+
+async function api(path, { tokenRequired = true } = {}) {
   const token = getToken();
   const sep = path.includes('?') ? '&' : '?';
-  const res = await fetch(`${path}${sep}token=${encodeURIComponent(token)}`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const withToken = token ? `${path}${sep}token=${encodeURIComponent(token)}` : path;
+
+  if (tokenRequired && !token) {
+    throw new Error('Token required');
+  }
+
+  const res = await fetch(withToken);
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
   return res.json();
 }
 
@@ -131,42 +414,215 @@ function fillSelect(el, arr, toLabel = (x) => x, toValue = (x) => x) {
   }
 }
 
+function updateSourceState() {
+  state.currentSource = sourceEl.value;
+  state.currentSession = sessionEl.value;
+  state.currentFile = fileEl.value;
+}
+
+function applySettings() {
+  document.body.classList.toggle('no-wrap', !wrapToggleEl.checked);
+  document.body.classList.toggle('high-contrast', contrastToggleEl.checked);
+  document.body.classList.toggle('reduce-motion', motionToggleEl.checked);
+  document.documentElement.style.setProperty('--content-font-size', `${fontSizeEl.value}px`);
+  fontSizeValueEl.textContent = `${fontSizeEl.value}px`;
+
+  localStorage.setItem('ethub.wrap', String(wrapToggleEl.checked));
+  localStorage.setItem('ethub.contrast', String(contrastToggleEl.checked));
+  localStorage.setItem('ethub.motion', String(motionToggleEl.checked));
+  localStorage.setItem('ethub.fontSize', String(fontSizeEl.value));
+}
+
+function restoreSettings() {
+  const wrap = localStorage.getItem('ethub.wrap');
+  const contrast = localStorage.getItem('ethub.contrast');
+  const motion = localStorage.getItem('ethub.motion');
+  const fontSize = localStorage.getItem('ethub.fontSize');
+
+  if (wrap != null) wrapToggleEl.checked = wrap === 'true';
+  if (contrast != null) contrastToggleEl.checked = contrast === 'true';
+  if (motion != null) motionToggleEl.checked = motion === 'true';
+  if (fontSize != null) fontSizeEl.value = fontSize;
+
+  applySettings();
+}
+
 async function loadSources() {
-  const data = await api('/api/sources');
+  const data = await api('/api/sources', { tokenRequired: false });
   fillSelect(sourceEl, data.sources, (x) => x.key, (x) => x.key);
+  updateSourceState();
 }
 
 async function loadSessions() {
-  const source = sourceEl.value;
-  const data = await api(`/api/list?source=${encodeURIComponent(source)}`);
+  updateSourceState();
+  const data = await api(`/api/list?source=${encodeURIComponent(state.currentSource)}`);
   fillSelect(sessionEl, data.entries);
   fillSelect(fileEl, []);
-  setStatus(`Loaded ${data.entries.length} entries for ${source}`);
+  updateSourceState();
+  setStatus(`Loaded ${data.entries.length} entries for ${state.currentSource}.`);
+  await refreshSessionClock();
 }
 
 async function loadFiles() {
-  const source = sourceEl.value;
-  const session = sessionEl.value;
-  const data = await api(`/api/list-files?source=${encodeURIComponent(source)}&session=${encodeURIComponent(session)}`);
+  updateSourceState();
+  const data = await api(`/api/list-files?source=${encodeURIComponent(state.currentSource)}&session=${encodeURIComponent(state.currentSession)}`);
   const filesOnly = data.entries.filter((x) => x.type === 'file');
   fillSelect(fileEl, filesOnly, (x) => `${x.name} (${x.size} bytes)`, (x) => x.name);
-  setStatus(`Loaded ${filesOnly.length} files in ${session}`);
+  updateSourceState();
+
+  if (filesOnly.length === 1) {
+    fileEl.value = filesOnly[0].name;
+    updateSourceState();
+  }
+
+  setStatus(`Loaded ${filesOnly.length} files in ${state.currentSession}.`);
+  await refreshSessionClock();
 }
 
 async function openFile() {
-  const source = sourceEl.value;
-  const session = sessionEl.value;
-  const file = fileEl.value;
-  const data = await api(`/api/read?source=${encodeURIComponent(source)}&session=${encodeURIComponent(session)}&file=${encodeURIComponent(file)}`);
-  contentEl.textContent = data.content;
-  setStatus(`Viewing ${source}/${session}/${file}`);
+  updateSourceState();
+  const data = await api(`/api/read?source=${encodeURIComponent(state.currentSource)}&session=${encodeURIComponent(state.currentSession)}&file=${encodeURIComponent(state.currentFile)}`);
+  contentEl.textContent = data.content || '[empty]';
+  setStatus(`Viewing ${state.currentSource}/${state.currentSession}/${state.currentFile}`);
 }
 
-document.getElementById('loadSessions').addEventListener('click', () => loadSessions().catch((e) => setStatus(e.message)));
-document.getElementById('loadFiles').addEventListener('click', () => loadFiles().catch((e) => setStatus(e.message)));
-document.getElementById('openFile').addEventListener('click', () => openFile().catch((e) => setStatus(e.message)));
+async function openLatestEthub() {
+  sourceEl.value = 'ethub';
+  updateSourceState();
+  await loadSessions();
+  if (!sessionEl.value) {
+    throw new Error('No ETHUB sessions found');
+  }
+  await loadFiles();
+  if (!fileEl.value) {
+    throw new Error('No files found in latest ETHUB session');
+  }
+  await openFile();
+}
 
-loadSources().then(() => setStatus('Token required for API actions')).catch((e) => setStatus(e.message));
+async function pollHealth() {
+  try {
+    const health = await api('/api/health', { tokenRequired: false });
+    setOnline(true, 'Online');
+    serverUptimeEl.textContent = formatDuration(health.uptime_ms);
+  } catch (err) {
+    setOnline(false, 'Offline');
+    serverUptimeEl.textContent = '--';
+  }
+}
+
+async function refreshSessionClock() {
+  updateSourceState();
+  if (!state.currentSource) {
+    sessionClockEl.textContent = '--';
+    state.sessionStartedAt = null;
+    return;
+  }
+
+  try {
+    const data = await api(`/api/session-status?source=${encodeURIComponent(state.currentSource)}&session=${encodeURIComponent(state.currentSession || '')}`);
+    state.sessionStartedAt = data.started_at || null;
+
+    if (state.currentSource !== 'ethub') {
+      sessionClockEl.textContent = 'N/A';
+      return;
+    }
+
+    if (!state.sessionStartedAt) {
+      sessionClockEl.textContent = '--';
+      return;
+    }
+
+    sessionClockEl.textContent = formatDuration(Date.now() - Date.parse(state.sessionStartedAt));
+  } catch (err) {
+    state.sessionStartedAt = null;
+    sessionClockEl.textContent = '--';
+  }
+}
+
+function startClockTicker() {
+  if (state.clockTimer) clearInterval(state.clockTimer);
+  state.clockTimer = setInterval(() => {
+    if (!state.sessionStartedAt || state.currentSource !== 'ethub') return;
+    const elapsed = Date.now() - Date.parse(state.sessionStartedAt);
+    sessionClockEl.textContent = formatDuration(elapsed);
+  }, 1000);
+}
+
+function setAutoRefresh(enabled) {
+  if (state.autoRefreshTimer) {
+    clearInterval(state.autoRefreshTimer);
+    state.autoRefreshTimer = null;
+  }
+  if (!enabled) return;
+  state.autoRefreshTimer = setInterval(() => {
+    if (state.currentSource && state.currentSession && state.currentFile) {
+      openFile().catch(() => {});
+    }
+  }, 5000);
+}
+
+function bindEvents() {
+  document.getElementById('loadSessions').addEventListener('click', () => loadSessions().catch((e) => setStatus(e.message)));
+  document.getElementById('loadFiles').addEventListener('click', () => loadFiles().catch((e) => setStatus(e.message)));
+  document.getElementById('openFile').addEventListener('click', () => openFile().catch((e) => setStatus(e.message)));
+  document.getElementById('openLatest').addEventListener('click', () => openLatestEthub().catch((e) => setStatus(e.message)));
+  document.getElementById('openChat').addEventListener('click', () => {
+    const token = getToken();
+    const suffix = token ? `?token=${encodeURIComponent(token)}` : '';
+    window.location.href = `/chat${suffix}`;
+  });
+
+  sourceEl.addEventListener('change', () => {
+    updateSourceState();
+    refreshSessionClock().catch(() => {});
+  });
+
+  sessionEl.addEventListener('change', () => {
+    updateSourceState();
+    refreshSessionClock().catch(() => {});
+  });
+
+  fileEl.addEventListener('change', updateSourceState);
+
+  [wrapToggleEl, contrastToggleEl, motionToggleEl, fontSizeEl].forEach((el) => {
+    el.addEventListener('input', applySettings);
+    el.addEventListener('change', applySettings);
+  });
+
+  autoRefreshToggleEl.addEventListener('change', () => {
+    setAutoRefresh(autoRefreshToggleEl.checked);
+  });
+
+  window.addEventListener('keydown', (ev) => {
+    if (ev.altKey && ev.key.toLowerCase() === 'l') {
+      ev.preventDefault();
+      openLatestEthub().catch((e) => setStatus(e.message));
+    }
+  });
+}
+
+async function init() {
+  const tokenFromQuery = new URLSearchParams(location.search).get('token') || '';
+  if (tokenFromQuery) tokenEl.value = tokenFromQuery;
+
+  restoreSettings();
+  bindEvents();
+  await loadSources();
+  setStatus('Ready. Load sessions, then files.');
+
+  await pollHealth();
+  if (state.healthTimer) clearInterval(state.healthTimer);
+  state.healthTimer = setInterval(() => pollHealth(), 4000);
+
+  startClockTicker();
+  await refreshSessionClock();
+}
+
+init().catch((err) => {
+  setStatus(err && err.message ? err.message : String(err));
+  setOnline(false, 'Offline');
+});
 </script>
 </body>
 </html>

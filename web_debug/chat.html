@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ETHUB Ollama Chat</title>
+<style>
+:root {
+  --bg: #091019;
+  --bg-2: #111f2f;
+  --panel: #0f1a28;
+  --line: #2d425e;
+  --text: #ecf4ff;
+  --muted: #98b0ce;
+  --accent: #45dfa7;
+  --accent-2: #7fb8ff;
+  --user: #173658;
+  --assistant: #142b23;
+  --danger: #ff6f6f;
+  --ok: #31d697;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: radial-gradient(circle at 20% 0%, #1a2b42 0%, var(--bg) 58%);
+  color: var(--text);
+  font-family: "Segoe UI", "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+}
+
+:focus-visible {
+  outline: 3px solid #ffd166;
+  outline-offset: 2px;
+}
+
+header {
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #111f30, #0d1927);
+  padding: 14px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-right: auto;
+}
+
+.badge {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #132338;
+  color: var(--muted);
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-right: 6px;
+  vertical-align: -1px;
+  background: #7d8fa8;
+}
+
+.dot.online { background: var(--ok); box-shadow: 0 0 8px #31d69788; }
+.dot.offline { background: var(--danger); box-shadow: 0 0 8px #ff6f6f66; }
+
+main {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  min-height: calc(100vh - 72px);
+}
+
+aside {
+  border-right: 1px solid var(--line);
+  background: linear-gradient(180deg, #101d2d, #0c1522);
+  padding: 12px;
+}
+
+section {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #0d1724;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.panel h2 {
+  margin: 0 0 8px;
+  font-size: 0.92rem;
+}
+
+label {
+  display: block;
+  margin: 7px 0 6px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+select, input, textarea, button {
+  width: 100%;
+  border: 1px solid #385374;
+  border-radius: 10px;
+  background: #17263a;
+  color: var(--text);
+  padding: 9px;
+  font-size: 0.93rem;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 74px;
+  max-height: 180px;
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: linear-gradient(180deg, #19304a, #14283e);
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+#status {
+  margin: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #0b1521;
+  padding: 9px;
+  color: var(--muted);
+}
+
+#messages {
+  flex: 1;
+  overflow: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.msg {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.msg.user {
+  background: var(--user);
+  border-color: #4d77a5;
+}
+
+.msg.assistant {
+  background: var(--assistant);
+  border-color: #3f7e69;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-bottom: 6px;
+}
+
+.compose {
+  border-top: 1px solid var(--line);
+  padding: 10px;
+  background: #0c1623;
+}
+
+@media (max-width: 980px) {
+  main { grid-template-columns: 1fr; }
+  aside { border-right: 0; border-bottom: 1px solid var(--line); }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <div class="title">ETHUB Ollama Chat</div>
+    <div class="badge"><span id="serverDot" class="dot"></span><span id="serverStatus">Server</span></div>
+    <div class="badge"><span id="ollamaDot" class="dot"></span><span id="ollamaStatus">Ollama</span></div>
+    <a class="badge" id="backLink" href="/">Back To Dashboard</a>
+  </div>
+</header>
+
+<main>
+  <aside>
+    <div class="panel">
+      <h2>Access</h2>
+      <label for="token">Token</label>
+      <input id="token" autocomplete="off" spellcheck="false" placeholder="token from web_debug startup" />
+
+      <label for="model">Model</label>
+      <select id="model"></select>
+
+      <div class="grid2" style="margin-top:8px;">
+        <button id="refreshModels" type="button">Refresh Models</button>
+        <button id="newChat" type="button">New Chat</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Response Tuning</h2>
+      <label for="temperature">Temperature</label>
+      <input id="temperature" type="range" min="0" max="1" step="0.05" value="0.7" />
+      <div class="meta">Current: <span id="tempValue">0.70</span></div>
+    </div>
+  </aside>
+
+  <section>
+    <div id="status" role="status" aria-live="polite">Ready.</div>
+    <div id="messages" aria-label="Chat transcript"></div>
+    <div class="compose">
+      <label for="prompt" class="meta">Message (Enter = send, Shift+Enter = newline)</label>
+      <textarea id="prompt" placeholder="Ask your local Ollama model..."></textarea>
+      <div class="grid2" style="margin-top:8px;">
+        <button id="send" type="button">Send</button>
+        <button id="clearPrompt" type="button">Clear</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const tokenEl = document.getElementById('token');
+const modelEl = document.getElementById('model');
+const temperatureEl = document.getElementById('temperature');
+const tempValueEl = document.getElementById('tempValue');
+const promptEl = document.getElementById('prompt');
+const messagesEl = document.getElementById('messages');
+const statusEl = document.getElementById('status');
+const serverDotEl = document.getElementById('serverDot');
+const ollamaDotEl = document.getElementById('ollamaDot');
+const serverStatusEl = document.getElementById('serverStatus');
+const ollamaStatusEl = document.getElementById('ollamaStatus');
+const backLinkEl = document.getElementById('backLink');
+
+const conversation = [];
+let healthTimer = null;
+
+function getToken() {
+  const p = new URLSearchParams(location.search).get('token');
+  return tokenEl.value || p || '';
+}
+
+function setStatus(msg) {
+  statusEl.textContent = msg;
+}
+
+function setDot(el, ok) {
+  el.classList.remove('online', 'offline');
+  el.classList.add(ok ? 'online' : 'offline');
+}
+
+function appendMessage(role, text) {
+  const wrap = document.createElement('div');
+  wrap.className = `msg ${role}`;
+
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  meta.textContent = `${role.toUpperCase()} • ${new Date().toLocaleTimeString()}`;
+
+  const body = document.createElement('div');
+  body.textContent = text;
+
+  wrap.appendChild(meta);
+  wrap.appendChild(body);
+  messagesEl.appendChild(wrap);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+async function api(path, { method = 'GET', body = undefined, tokenRequired = true } = {}) {
+  const token = getToken();
+  if (tokenRequired && !token) throw new Error('Token required');
+
+  const sep = path.includes('?') ? '&' : '?';
+  const url = token ? `${path}${sep}token=${encodeURIComponent(token)}` : path;
+  const res = await fetch(url, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || `HTTP ${res.status}`);
+  }
+  return data;
+}
+
+async function loadModels() {
+  const data = await api('/api/models');
+  const models = Array.isArray(data.models) ? data.models : [];
+  modelEl.innerHTML = '';
+
+  if (!models.length) {
+    const o = document.createElement('option');
+    o.value = 'qwen2.5:0.5b';
+    o.textContent = 'qwen2.5:0.5b';
+    modelEl.appendChild(o);
+    setStatus('No models from Ollama tags; fallback model set.');
+    return;
+  }
+
+  for (const m of models) {
+    const o = document.createElement('option');
+    o.value = m;
+    o.textContent = m;
+    modelEl.appendChild(o);
+  }
+
+  const preferred = 'qwen2.5:0.5b';
+  if (models.includes(preferred)) modelEl.value = preferred;
+  setStatus(`Loaded ${models.length} models.`);
+}
+
+async function pollHealth() {
+  try {
+    await api('/api/health', { tokenRequired: false });
+    setDot(serverDotEl, true);
+    serverStatusEl.textContent = 'Server Online';
+  } catch {
+    setDot(serverDotEl, false);
+    serverStatusEl.textContent = 'Server Offline';
+  }
+
+  try {
+    const data = await api('/api/ollama-health', { tokenRequired: false });
+    setDot(ollamaDotEl, Boolean(data.ok));
+    ollamaStatusEl.textContent = data.ok ? `Ollama Online (${data.model_count || 0} models)` : 'Ollama Offline';
+  } catch {
+    setDot(ollamaDotEl, false);
+    ollamaStatusEl.textContent = 'Ollama Offline';
+  }
+}
+
+async function sendPrompt() {
+  const text = promptEl.value.trim();
+  if (!text) return;
+
+  const model = modelEl.value || 'qwen2.5:0.5b';
+  const temperature = Number(temperatureEl.value);
+
+  conversation.push({ role: 'user', content: text });
+  appendMessage('user', text);
+  promptEl.value = '';
+  setStatus('Waiting for Ollama response...');
+
+  try {
+    const data = await api('/api/chat', {
+      method: 'POST',
+      body: { model, messages: conversation, temperature }
+    });
+
+    const assistantText = data && data.message && data.message.content
+      ? String(data.message.content)
+      : '[no output]';
+
+    conversation.push({ role: 'assistant', content: assistantText });
+    appendMessage('assistant', assistantText);
+    setStatus(`Response received from ${model}.`);
+  } catch (error) {
+    const msg = error && error.message ? error.message : String(error);
+    appendMessage('assistant', `[error] ${msg}`);
+    setStatus(`Error: ${msg}`);
+  }
+}
+
+function newChat() {
+  conversation.splice(0, conversation.length);
+  messagesEl.innerHTML = '';
+  setStatus('New chat started.');
+}
+
+function bindEvents() {
+  document.getElementById('refreshModels').addEventListener('click', () => loadModels().catch((e) => setStatus(e.message)));
+  document.getElementById('newChat').addEventListener('click', newChat);
+  document.getElementById('send').addEventListener('click', () => sendPrompt().catch((e) => setStatus(e.message)));
+  document.getElementById('clearPrompt').addEventListener('click', () => {
+    promptEl.value = '';
+    promptEl.focus();
+  });
+
+  temperatureEl.addEventListener('input', () => {
+    tempValueEl.textContent = Number(temperatureEl.value).toFixed(2);
+  });
+
+  promptEl.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' && !ev.shiftKey) {
+      ev.preventDefault();
+      sendPrompt().catch((e) => setStatus(e.message));
+    }
+  });
+}
+
+async function init() {
+  const q = new URLSearchParams(location.search);
+  const tokenFromQuery = q.get('token') || '';
+  if (tokenFromQuery) tokenEl.value = tokenFromQuery;
+
+  const suffix = tokenFromQuery ? `?token=${encodeURIComponent(tokenFromQuery)}` : '';
+  backLinkEl.href = `/${suffix}`;
+
+  bindEvents();
+  tempValueEl.textContent = Number(temperatureEl.value).toFixed(2);
+
+  await pollHealth();
+  await loadModels();
+  if (healthTimer) clearInterval(healthTimer);
+  healthTimer = setInterval(() => pollHealth(), 5000);
+
+  promptEl.focus();
+}
+
+init().catch((err) => {
+  setStatus(err && err.message ? err.message : String(err));
+  setDot(serverDotEl, false);
+  setDot(ollamaDotEl, false);
+});
+</script>
+</body>
+</html>
