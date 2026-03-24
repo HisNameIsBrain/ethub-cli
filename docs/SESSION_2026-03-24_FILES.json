@@ -1,0 +1,16 @@
+{
+  "date_utc": "2026-03-24",
+  "docs": [
+    "docs/SESSION_2026-03-24.md",
+    "docs/CODEX_LINE_CHANGES_20260324_082748.log"
+  ],
+  "generated_from": {
+    "session_logs_root": "ethub_cli_session_logs",
+    "change_logs_root": "ethub_cli_change_logs",
+    "codex_logs_root": "codex_logs"
+  },
+  "notes": [
+    "Per-session logs are created as new files/directories and not overwritten.",
+    "Line-numbered source snapshots are stored in ethub_cli_change_logs and copied into docs as CODEX_LINE_CHANGES_*.log."
+  ]
+}

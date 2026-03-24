@@ -1,0 +1,11 @@
+{"index":1,"ts":"2026-03-24T08:17:36.286Z","type":"session_start","payload":{"app":"ethub-cli-agent","started_at":"2026-03-24T08:17:36.286Z","session_dir":"/root/ethub-cli/ethub_cli_session_logs/session_20260324_081736_284","cwd":"/root/ethub-cli","node":"v24.14.0","platform":"linux 6.8.0-106-generic","ollama_url":"http://127.0.0.1:11434/api/chat","model_default":"llama3.1"}}
+{"index":2,"ts":"2026-03-24T08:17:36.294Z","type":"config","payload":{"require_approval":true,"model":"llama3.1","ollama_url":"http://127.0.0.1:11434/api/chat","commands":["/help","/status","/model <name>","/approve on|off","/yes","/no","/exit"]}}
+{"index":3,"ts":"2026-03-24T08:17:36.295Z","type":"stdout","payload":{"text":"ETHUB CLI Agent started. Ollama only, no external dependencies."}}
+{"index":4,"ts":"2026-03-24T08:17:36.295Z","type":"stdout","payload":{"text":"Session logs: /root/ethub-cli/ethub_cli_session_logs/session_20260324_081736_284"}}
+{"index":5,"ts":"2026-03-24T08:17:36.295Z","type":"stdout","payload":{"text":"Type /help for commands."}}
+{"index":6,"ts":"2026-03-24T08:17:36.297Z","type":"stdin","payload":{"raw":"/status","trimmed":"/status"}}
+{"index":7,"ts":"2026-03-24T08:17:36.298Z","type":"subcommand","payload":{"command":"/status","args":[]}}
+{"index":8,"ts":"2026-03-24T08:17:36.298Z","type":"stdout","payload":{"text":"{\"model\":\"llama3.1\",\"ollama_url\":\"http://127.0.0.1:11434/api/chat\",\"require_approval\":true,\"history_count\":0,\"pending_action\":null}"}}
+{"index":9,"ts":"2026-03-24T08:17:36.298Z","type":"stdin","payload":{"raw":"/exit","trimmed":"/exit"}}
+{"index":10,"ts":"2026-03-24T08:17:36.298Z","type":"subcommand","payload":{"command":"/exit","args":[]}}
+{"index":11,"ts":"2026-03-24T08:17:36.299Z","type":"session_end","payload":{"ended_at":"2026-03-24T08:17:36.299Z"}}

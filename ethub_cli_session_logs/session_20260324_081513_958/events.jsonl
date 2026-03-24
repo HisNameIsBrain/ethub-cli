@@ -1,0 +1,8 @@
+{"index":1,"ts":"2026-03-24T08:15:13.959Z","type":"session_start","payload":{"app":"ethub-cli-agent","started_at":"2026-03-24T08:15:13.959Z","session_dir":"/root/ethub-cli/ethub_cli_session_logs/session_20260324_081513_958","cwd":"/root/ethub-cli","node":"v24.14.0","platform":"linux 6.8.0-106-generic","ollama_url":"http://127.0.0.1:11434/api/chat","model_default":"llama3.1"}}
+{"index":2,"ts":"2026-03-24T08:15:13.966Z","type":"config","payload":{"require_approval":true,"model":"llama3.1","ollama_url":"http://127.0.0.1:11434/api/chat","commands":["/help","/status","/model <name>","/approve on|off","/yes","/no","/exit"]}}
+{"index":3,"ts":"2026-03-24T08:15:13.967Z","type":"stdout","payload":{"text":"ETHUB CLI Agent started. Ollama only, no external dependencies."}}
+{"index":4,"ts":"2026-03-24T08:15:13.967Z","type":"stdout","payload":{"text":"Session logs: /root/ethub-cli/ethub_cli_session_logs/session_20260324_081513_958"}}
+{"index":5,"ts":"2026-03-24T08:15:13.967Z","type":"stdout","payload":{"text":"Type /help for commands."}}
+{"index":6,"ts":"2026-03-24T08:15:13.968Z","type":"stdin","payload":{"raw":"/exit","trimmed":"/exit"}}
+{"index":7,"ts":"2026-03-24T08:15:13.968Z","type":"subcommand","payload":{"command":"/exit","args":[]}}
+{"index":8,"ts":"2026-03-24T08:15:13.969Z","type":"session_end","payload":{"ended_at":"2026-03-24T08:15:13.969Z"}}
