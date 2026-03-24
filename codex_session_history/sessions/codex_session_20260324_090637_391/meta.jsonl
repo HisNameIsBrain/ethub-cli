@@ -1,0 +1,2 @@
+{"ts":"2026-03-24T09:06:37Z","event":"session_start","session_id":"codex_session_20260324_090637_391","command":"bash -lc 'printf "l1\nl2\nl3\nl4\nl5\n"'","max_lines":3}
+{"ts":"2026-03-24T09:06:37Z","event":"session_end","session_id":"codex_session_20260324_090637_391","exit_code":0}

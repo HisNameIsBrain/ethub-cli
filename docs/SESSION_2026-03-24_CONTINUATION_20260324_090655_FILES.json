@@ -1,0 +1,17 @@
+{
+  "generated_at_utc": "2026-03-24T09:06:55Z",
+  "continuation_doc": "docs/SESSION_2026-03-24_CONTINUATION_20260324_090655.md",
+  "new_files": [
+    "README.md",
+    "tools/codex_log_rotator.mjs",
+    "tools/start_codex_session_logging.sh",
+    "web_debug/codex_debug_server.mjs",
+    "docs/SESSION_2026-03-24_CONTINUATION_20260324_090655.md"
+  ],
+  "log_roots": [
+    "codex_session_history/sessions",
+    "ethub_cli_session_logs",
+    "ethub_cli_change_logs",
+    "codex_logs"
+  ]
+}

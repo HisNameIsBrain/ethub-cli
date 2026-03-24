@@ -1,0 +1,172 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ETHUB web_debug</title>
+<style>
+:root {
+  --bg: #0c1117;
+  --panel: #121925;
+  --line: #263248;
+  --text: #e6edf7;
+  --muted: #8ea0bf;
+  --accent: #29c48a;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: radial-gradient(circle at top, #111a2a, #0c1117 45%);
+  color: var(--text);
+}
+header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #0f1622;
+}
+main {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  min-height: calc(100vh - 60px);
+}
+aside {
+  border-right: 1px solid var(--line);
+  padding: 12px;
+  background: #101725;
+}
+section {
+  padding: 12px;
+}
+label { display: block; margin: 8px 0 6px; color: var(--muted); }
+select, button, input {
+  width: 100%;
+  background: #1a2436;
+  color: var(--text);
+  border: 1px solid #31425f;
+  border-radius: 8px;
+  padding: 8px;
+}
+button { margin-top: 8px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #0a0f18;
+  padding: 12px;
+  min-height: 72vh;
+  max-height: 72vh;
+  overflow: auto;
+}
+.meta { color: var(--muted); margin-bottom: 10px; }
+@media (max-width: 900px) {
+  main { grid-template-columns: 1fr; }
+  aside { border-right: 0; border-bottom: 1px solid var(--line); }
+  pre { min-height: 50vh; max-height: 50vh; }
+}
+</style>
+</head>
+<body>
+<header>
+  <strong>ETHUB web_debug</strong>
+  <div class="meta">Local safe server view for ETHUB/Codex/docs logs on port 3000</div>
+</header>
+<main>
+  <aside>
+    <label>Token</label>
+    <input id="token" placeholder="paste token from server startup" />
+
+    <label>Source</label>
+    <select id="source"></select>
+
+    <button id="loadSessions">Load Sessions</button>
+
+    <label>Session/File Group</label>
+    <select id="session"></select>
+
+    <button id="loadFiles">Load Files</button>
+
+    <label>File</label>
+    <select id="file"></select>
+
+    <button id="openFile">Open File</button>
+  </aside>
+  <section>
+    <div class="meta" id="status">Ready</div>
+    <pre id="content"></pre>
+  </section>
+</main>
+<script>
+const sourceEl = document.getElementById('source');
+const sessionEl = document.getElementById('session');
+const fileEl = document.getElementById('file');
+const tokenEl = document.getElementById('token');
+const statusEl = document.getElementById('status');
+const contentEl = document.getElementById('content');
+
+function getToken() {
+  const p = new URLSearchParams(location.search).get('token');
+  return tokenEl.value || p || '';
+}
+
+function setStatus(msg) { statusEl.textContent = msg; }
+
+async function api(path) {
+  const token = getToken();
+  const sep = path.includes('?') ? '&' : '?';
+  const res = await fetch(`${path}${sep}token=${encodeURIComponent(token)}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+function fillSelect(el, arr, toLabel = (x) => x, toValue = (x) => x) {
+  el.innerHTML = '';
+  for (const item of arr) {
+    const o = document.createElement('option');
+    o.value = toValue(item);
+    o.textContent = toLabel(item);
+    el.appendChild(o);
+  }
+}
+
+async function loadSources() {
+  const data = await api('/api/sources');
+  fillSelect(sourceEl, data.sources, (x) => x.key, (x) => x.key);
+}
+
+async function loadSessions() {
+  const source = sourceEl.value;
+  const data = await api(`/api/list?source=${encodeURIComponent(source)}`);
+  fillSelect(sessionEl, data.entries);
+  fillSelect(fileEl, []);
+  setStatus(`Loaded ${data.entries.length} entries for ${source}`);
+}
+
+async function loadFiles() {
+  const source = sourceEl.value;
+  const session = sessionEl.value;
+  const data = await api(`/api/list-files?source=${encodeURIComponent(source)}&session=${encodeURIComponent(session)}`);
+  const filesOnly = data.entries.filter((x) => x.type === 'file');
+  fillSelect(fileEl, filesOnly, (x) => `${x.name} (${x.size} bytes)`, (x) => x.name);
+  setStatus(`Loaded ${filesOnly.length} files in ${session}`);
+}
+
+async function openFile() {
+  const source = sourceEl.value;
+  const session = sessionEl.value;
+  const file = fileEl.value;
+  const data = await api(`/api/read?source=${encodeURIComponent(source)}&session=${encodeURIComponent(session)}&file=${encodeURIComponent(file)}`);
+  contentEl.textContent = data.content;
+  setStatus(`Viewing ${source}/${session}/${file}`);
+}
+
+document.getElementById('loadSessions').addEventListener('click', () => loadSessions().catch((e) => setStatus(e.message)));
+document.getElementById('loadFiles').addEventListener('click', () => loadFiles().catch((e) => setStatus(e.message)));
+document.getElementById('openFile').addEventListener('click', () => openFile().catch((e) => setStatus(e.message)));
+
+loadSources().then(() => setStatus('Token required for API actions')).catch((e) => setStatus(e.message));
+</script>
+</body>
+</html>

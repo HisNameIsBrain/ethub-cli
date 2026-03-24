@@ -10,8 +10,6 @@ const DEFAULT_OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434/api
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'llama3.1';
 const LOG_ROOT = path.join(process.cwd(), 'ethub_cli_session_logs');
 const CHANGE_LOG_ROOT = path.join(process.cwd(), 'ethub_cli_change_logs');
-const CODEX_LOG_ROOT = path.join(process.cwd(), 'codex_logs');
-const CODEX_MAX_LINES_PER_FILE = 2000;
 
 function nowIso() {
   return new Date().toISOString();
@@ -61,7 +59,6 @@ class SessionLogger {
   constructor(rootDir) {
     ensureDir(rootDir);
     ensureDir(CHANGE_LOG_ROOT);
-    ensureDir(CODEX_LOG_ROOT);
     this.rootDir = rootDir;
     this.sessionId = this.buildSessionId();
     this.sessionDir = path.join(this.rootDir, this.sessionId);
@@ -73,10 +70,6 @@ class SessionLogger {
     this.structuredPath = path.join(this.sessionDir, 'structured_history.jsonl');
     this.latestPath = path.join(this.rootDir, 'LATEST_SESSION.txt');
     this.changeLogPath = path.join(CHANGE_LOG_ROOT, `${this.sessionId}_changes.log`);
-    this.codexMetaPath = path.join(CODEX_LOG_ROOT, `codex_${this.sessionId}.meta.json`);
-    this.codexLineCount = 0;
-    this.codexPart = 1;
-    this.codexEventsPath = this.getCodexEventsPath(this.codexPart);
 
     this.counter = 0;
     fs.writeFileSync(this.latestPath, `${this.sessionId}\n`, 'utf8');
@@ -86,20 +79,6 @@ class SessionLogger {
       'utf8'
     );
     this.writeCodeSnapshot();
-    fs.writeFileSync(
-      this.codexMetaPath,
-      `${safeJson({
-        app: APP_NAME,
-        session_id: this.sessionId,
-        created_at: nowIso(),
-        cwd: process.cwd(),
-        source: path.resolve(__filename),
-        codex_max_lines_per_file: CODEX_MAX_LINES_PER_FILE,
-        codex_current_part: this.codexPart,
-        codex_current_file: path.basename(this.codexEventsPath)
-      })}\n`,
-      'utf8'
-    );
 
     this.writeEvent('session_start', {
       app: APP_NAME,
@@ -138,36 +117,6 @@ class SessionLogger {
       payload
     };
     fs.appendFileSync(this.eventsPath, `${safeJson(event)}\n`, 'utf8');
-    this.writeCodexEvent({ session_id: this.sessionId, ...event });
-  }
-
-  getCodexEventsPath(part) {
-    const suffix = part === 1 ? '' : `_part${String(part).padStart(3, '0')}`;
-    return path.join(CODEX_LOG_ROOT, `codex_${this.sessionId}${suffix}.jsonl`);
-  }
-
-  rotateCodexLog() {
-    this.codexPart += 1;
-    this.codexLineCount = 0;
-    this.codexEventsPath = this.getCodexEventsPath(this.codexPart);
-    fs.appendFileSync(
-      this.codexMetaPath,
-      `${safeJson({
-        ts: nowIso(),
-        event: 'codex_log_rotate',
-        codex_current_part: this.codexPart,
-        codex_current_file: path.basename(this.codexEventsPath)
-      })}\n`,
-      'utf8'
-    );
-  }
-
-  writeCodexEvent(event) {
-    if (this.codexLineCount >= CODEX_MAX_LINES_PER_FILE) {
-      this.rotateCodexLog();
-    }
-    fs.appendFileSync(this.codexEventsPath, `${safeJson(event)}\n`, 'utf8');
-    this.codexLineCount += 1;
   }
 
   writeTranscript(role, content) {
