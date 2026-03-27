@@ -1,2 +1,0 @@
-{"ts":"2026-03-24T09:13:52Z","role":"user","content":"i said codex logs should not run scripts or cmds. its only a logger it doesnt need the libraries u added"}
-{"ts":"2026-03-24T09:13:52Z","role":"assistant","content":"Removed script/server tooling and switched to logger-only file model."}
