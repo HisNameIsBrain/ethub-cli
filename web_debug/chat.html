@@ -226,6 +226,7 @@ button:hover {
       <div class="grid2" style="margin-top:8px;">
         <button id="refreshModels" type="button">Refresh Models</button>
         <button id="newChat" type="button">New Chat</button>
+        <button id="clearSession" type="button" style="grid-column: 1 / -1;">Clear Session + Dashboard</button>
       </div>
     </div>
 
@@ -264,9 +265,62 @@ const ollamaDotEl = document.getElementById('ollamaDot');
 const serverStatusEl = document.getElementById('serverStatus');
 const ollamaStatusEl = document.getElementById('ollamaStatus');
 const backLinkEl = document.getElementById('backLink');
+const clearSessionEl = document.getElementById('clearSession');
 
 const conversation = [];
+let currentSessionId = '';
 let healthTimer = null;
+
+const sessionManager = {
+  async start() {
+    const data = await api('/api/chat-session/start', {
+      method: 'POST',
+      body: {}
+    });
+    currentSessionId = String(data.session_id || '');
+    localStorage.setItem('ethub.chat.currentSessionId', currentSessionId);
+    return currentSessionId;
+  },
+  async appendEvent(type, payload) {
+    if (!currentSessionId) await this.start();
+    await api('/api/chat-session/event', {
+      method: 'POST',
+      body: {
+        session_id: currentSessionId,
+        type,
+        payload
+      }
+    });
+  },
+  async load(sessionId) {
+    const id = String(sessionId || '').trim();
+    if (!id) return false;
+    const data = await api(`/api/chat-session?session_id=${encodeURIComponent(id)}`);
+    const events = Array.isArray(data.events) ? data.events : [];
+    conversation.splice(0, conversation.length);
+    messagesEl.innerHTML = '';
+    for (const evt of events) {
+      if (evt && evt.type === 'message' && evt.payload && (evt.payload.role === 'user' || evt.payload.role === 'assistant')) {
+        const role = String(evt.payload.role);
+        const content = String(evt.payload.content || '');
+        conversation.push({ role, content });
+        appendMessage(role, content);
+      }
+    }
+    currentSessionId = id;
+    localStorage.setItem('ethub.chat.currentSessionId', currentSessionId);
+    return true;
+  },
+  async clear() {
+    if (!currentSessionId) return { dashboard_path: '/?source=chat' };
+    const data = await api('/api/chat-session/clear', {
+      method: 'POST',
+      body: { session_id: currentSessionId }
+    });
+    localStorage.removeItem('ethub.chat.currentSessionId');
+    return data || { dashboard_path: '/?source=chat' };
+  }
+};
 
 function getToken() {
   const p = new URLSearchParams(location.search).get('token');
@@ -373,6 +427,7 @@ async function sendPrompt() {
 
   conversation.push({ role: 'user', content: text });
   appendMessage('user', text);
+  await sessionManager.appendEvent('message', { role: 'user', content: text });
   promptEl.value = '';
   setStatus('Waiting for Ollama response...');
 
@@ -388,6 +443,11 @@ async function sendPrompt() {
 
     conversation.push({ role: 'assistant', content: assistantText });
     appendMessage('assistant', assistantText);
+    await sessionManager.appendEvent('message', {
+      role: 'assistant',
+      content: assistantText,
+      model
+    });
     setStatus(`Response received from ${model}.`);
   } catch (error) {
     const msg = error && error.message ? error.message : String(error);
@@ -400,11 +460,26 @@ function newChat() {
   conversation.splice(0, conversation.length);
   messagesEl.innerHTML = '';
   setStatus('New chat started.');
+  sessionManager.start().catch((err) => {
+    setStatus(err && err.message ? err.message : String(err));
+  });
+}
+
+async function clearSessionAndReturn() {
+  setStatus('Clearing session and returning to dashboard...');
+  const result = await sessionManager.clear();
+  const token = getToken();
+  let target = result && result.dashboard_path ? String(result.dashboard_path) : '/?source=chat';
+  if (token && !/[?&]token=/.test(target)) {
+    target += (target.includes('?') ? '&' : '?') + `token=${encodeURIComponent(token)}`;
+  }
+  window.location.href = target;
 }
 
 function bindEvents() {
   document.getElementById('refreshModels').addEventListener('click', () => loadModels().catch((e) => setStatus(e.message)));
   document.getElementById('newChat').addEventListener('click', newChat);
+  clearSessionEl.addEventListener('click', () => clearSessionAndReturn().catch((e) => setStatus(e.message)));
   document.getElementById('send').addEventListener('click', () => sendPrompt().catch((e) => setStatus(e.message)));
   document.getElementById('clearPrompt').addEventListener('click', () => {
     promptEl.value = '';
@@ -426,6 +501,7 @@ function bindEvents() {
 async function init() {
   const q = new URLSearchParams(location.search);
   const tokenFromQuery = q.get('token') || '';
+  const sessionFromQuery = q.get('session_id') || '';
   if (tokenFromQuery) tokenEl.value = tokenFromQuery;
 
   const suffix = tokenFromQuery ? `?token=${encodeURIComponent(tokenFromQuery)}` : '';
@@ -436,6 +512,17 @@ async function init() {
 
   await pollHealth();
   await loadModels();
+  if (sessionFromQuery) {
+    await sessionManager.load(sessionFromQuery).catch(() => {});
+  } else {
+    const existing = localStorage.getItem('ethub.chat.currentSessionId') || '';
+    if (existing) {
+      const loaded = await sessionManager.load(existing).catch(() => false);
+      if (!loaded) await sessionManager.start();
+    } else {
+      await sessionManager.start();
+    }
+  }
   if (healthTimer) clearInterval(healthTimer);
   healthTimer = setInterval(() => pollHealth(), 5000);
 

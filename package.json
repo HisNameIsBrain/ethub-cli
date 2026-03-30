@@ -14,10 +14,16 @@
   "author": "HisNameIsBrain",
   "type": "commonjs",
   "main": "ethub_cli.js",
+  "bin": {
+    "ethub": "./ethub",
+    "ethub-cli": "./ethub_cli.js",
+    "dashboard": "./dashboard"
+  },
   "directories": {
     "doc": "docs"
   },
   "scripts": {
-    "test": "node ethub_cli.js"
+    "test": "node ethub_cli.js",
+    "dashboard": "node dashboard"
   }
 }

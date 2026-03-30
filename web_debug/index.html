@@ -218,6 +218,95 @@ input[type="range"] {
   margin-bottom: 10px;
 }
 
+.live-board {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background:
+    radial-gradient(1200px 300px at 5% -20%, #22456d66 0%, transparent 50%),
+    linear-gradient(145deg, #0c1726 0%, #101f33 100%);
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.live-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.live-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.pulse {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--ok);
+  box-shadow: 0 0 0 0 #2fd48f99;
+  animation: pulse-ring 1.6s ease-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 #2fd48f99; }
+  70% { box-shadow: 0 0 0 10px #2fd48f00; }
+  100% { box-shadow: 0 0 0 0 #2fd48f00; }
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.metric-card {
+  border: 1px solid #355174;
+  border-radius: 12px;
+  background: #0b1523cc;
+  padding: 10px;
+}
+
+.metric-label {
+  font-size: 0.74rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.metric-value {
+  margin-top: 4px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.mini-list {
+  border: 1px solid #2e4564;
+  border-radius: 12px;
+  background: #0a121ecc;
+  padding: 8px;
+  min-height: 66px;
+  max-height: 180px;
+  overflow: auto;
+  font-family: "IBM Plex Mono", "Consolas", "Menlo", monospace;
+  font-size: 12px;
+}
+
+.mini-row {
+  margin: 0;
+  padding: 4px 0;
+  border-bottom: 1px solid #1a2f49;
+  color: #b8cae4;
+}
+
+.mini-row:last-child {
+  border-bottom: 0;
+}
+
 pre {
   margin: 0;
   border: 1px solid var(--line);
@@ -253,6 +342,7 @@ body.no-wrap pre {
   main { grid-template-columns: 1fr; }
   aside { border-right: 0; border-bottom: 1px solid var(--line); }
   pre { min-height: 52vh; max-height: 52vh; }
+  .metric-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
 }
 </style>
 </head>
@@ -295,6 +385,7 @@ body.no-wrap pre {
         <button id="loadFiles" type="button">Load Files</button>
         <button id="openFile" class="wide" type="button">Open Selected File</button>
         <button id="openLatest" class="wide" type="button">Open Latest Session (ETHUB)</button>
+        <button id="openCornell" class="wide" type="button">Open Cornell Change Notes</button>
         <button id="openChat" class="wide" type="button">Open Ollama Chat</button>
       </div>
       <div class="subtitle">Tip: <span class="kbd">Alt</span> + <span class="kbd">L</span> opens latest ETHUB session.</div>
@@ -330,6 +421,34 @@ body.no-wrap pre {
   </aside>
 
   <section>
+    <div class="live-board" aria-label="ETHUB live insights">
+      <div class="live-header">
+        <div class="live-title">ETHUB Live Dashboard</div>
+        <div class="badge online-pill" title="Auto-powered when CLI starts">
+          <span class="pulse"></span>
+          <span id="liveBoardState">standby</span>
+        </div>
+      </div>
+      <div class="metric-grid">
+        <div class="metric-card">
+          <div class="metric-label">Skills</div>
+          <div class="metric-value" id="metricSkills">0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Pending Action</div>
+          <div class="metric-value" id="metricPending">none</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Approvals</div>
+          <div class="metric-value" id="metricApprovals">0/0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Skill Runs</div>
+          <div class="metric-value" id="metricRuns">0</div>
+        </div>
+      </div>
+      <div class="mini-list" id="liveEvents">No recent skill events yet.</div>
+    </div>
     <div id="status" class="status" role="status" aria-live="polite">Ready</div>
     <pre id="content" tabindex="0" aria-label="File content viewer"></pre>
   </section>
@@ -346,6 +465,12 @@ const onlineDotEl = document.getElementById('onlineDot');
 const onlineTextEl = document.getElementById('onlineText');
 const serverUptimeEl = document.getElementById('serverUptime');
 const sessionClockEl = document.getElementById('sessionClock');
+const liveBoardStateEl = document.getElementById('liveBoardState');
+const metricSkillsEl = document.getElementById('metricSkills');
+const metricPendingEl = document.getElementById('metricPending');
+const metricApprovalsEl = document.getElementById('metricApprovals');
+const metricRunsEl = document.getElementById('metricRuns');
+const liveEventsEl = document.getElementById('liveEvents');
 
 const wrapToggleEl = document.getElementById('wrapToggle');
 const contrastToggleEl = document.getElementById('contrastToggle');
@@ -359,9 +484,11 @@ const state = {
   currentSession: '',
   currentFile: '',
   sessionStartedAt: null,
+  autoOpenedEthub: false,
   healthTimer: null,
   clockTimer: null,
-  autoRefreshTimer: null
+  autoRefreshTimer: null,
+  insightsTimer: null
 };
 
 function getToken() {
@@ -386,6 +513,28 @@ function setOnline(ok, text) {
   onlineDotEl.classList.remove('online', 'offline');
   onlineDotEl.classList.add(ok ? 'online' : 'offline');
   onlineTextEl.textContent = text;
+}
+
+function setLiveEvents(rows) {
+  if (!Array.isArray(rows) || !rows.length) {
+    liveEventsEl.textContent = 'No recent skill events yet.';
+    return;
+  }
+  liveEventsEl.innerHTML = '';
+  for (const row of rows) {
+    const p = document.createElement('p');
+    p.className = 'mini-row';
+    const ts = row && row.ts ? new Date(row.ts).toLocaleTimeString() : '--:--:--';
+    const type = row && row.type ? row.type : 'event';
+    let detail = '';
+    if (row && row.payload && typeof row.payload === 'object') {
+      if (row.payload.skill_name) detail = ` ${row.payload.skill_name}`;
+      else if (row.payload.action_id) detail = ` ${row.payload.action_id}`;
+      else if (row.payload.candidates != null) detail = ` ${row.payload.candidates} candidates`;
+    }
+    p.textContent = `${ts}  ${type}${detail}`;
+    liveEventsEl.appendChild(p);
+  }
 }
 
 async function api(path, { tokenRequired = true } = {}) {
@@ -500,6 +649,30 @@ async function openLatestEthub() {
   await openFile();
 }
 
+async function openCornellNotes() {
+  const notesFile = 'cornell_change_notes_2026-03-30.md';
+  sourceEl.value = 'docs';
+  updateSourceState();
+  await loadSessions();
+  if (!sessionEl.value) {
+    throw new Error('No docs files found');
+  }
+
+  const options = Array.from(sessionEl.options).map((o) => o.value);
+  const target = options.find((name) => String(name).toLowerCase() === notesFile.toLowerCase())
+    || options.find((name) => String(name).toLowerCase().includes('cornell_change_notes'))
+    || sessionEl.value;
+
+  sessionEl.value = target;
+  updateSourceState();
+  await loadFiles();
+  if (!fileEl.value) {
+    throw new Error(`No file entries found for ${target}`);
+  }
+  await openFile();
+  setStatus(`Opened docs/${fileEl.value}`);
+}
+
 async function pollHealth() {
   try {
     const health = await api('/api/health', { tokenRequired: false });
@@ -508,6 +681,31 @@ async function pollHealth() {
   } catch (err) {
     setOnline(false, 'Offline');
     serverUptimeEl.textContent = '--';
+  }
+}
+
+async function pollEthubInsights() {
+  try {
+    const data = await api('/api/ethub-insights');
+    const hasLiveSession = Boolean(data && data.session);
+    liveBoardStateEl.textContent = hasLiveSession ? `active: ${data.session}` : 'standby';
+    metricSkillsEl.textContent = String(data && data.skills_total != null ? data.skills_total : 0);
+    metricPendingEl.textContent = data && data.pending_action ? String(data.pending_action) : 'none';
+    const approved = data && data.approvals ? Number(data.approvals.approved || 0) : 0;
+    const rejected = data && data.approvals ? Number(data.approvals.rejected || 0) : 0;
+    metricApprovalsEl.textContent = `${approved}/${rejected}`;
+    const runs = data && data.metrics ? Number(data.metrics.skill_runs || 0) : 0;
+    const fails = data && data.metrics ? Number(data.metrics.skill_run_failures || 0) : 0;
+    metricRunsEl.textContent = `${runs} (${fails} fail)`;
+    setLiveEvents(data && Array.isArray(data.recent) ? data.recent : []);
+
+    if (hasLiveSession && !state.autoOpenedEthub && !new URLSearchParams(location.search).get('source')) {
+      state.autoOpenedEthub = true;
+      await openLatestEthub();
+      setStatus(`Auto-opened latest ETHUB session: ${data.session}`);
+    }
+  } catch {
+    liveBoardStateEl.textContent = 'offline';
   }
 }
 
@@ -567,6 +765,7 @@ function bindEvents() {
   document.getElementById('loadFiles').addEventListener('click', () => loadFiles().catch((e) => setStatus(e.message)));
   document.getElementById('openFile').addEventListener('click', () => openFile().catch((e) => setStatus(e.message)));
   document.getElementById('openLatest').addEventListener('click', () => openLatestEthub().catch((e) => setStatus(e.message)));
+  document.getElementById('openCornell').addEventListener('click', () => openCornellNotes().catch((e) => setStatus(e.message)));
   document.getElementById('openChat').addEventListener('click', () => {
     const token = getToken();
     const suffix = token ? `?token=${encodeURIComponent(token)}` : '';
@@ -603,7 +802,11 @@ function bindEvents() {
 }
 
 async function init() {
-  const tokenFromQuery = new URLSearchParams(location.search).get('token') || '';
+  const q = new URLSearchParams(location.search);
+  const tokenFromQuery = q.get('token') || '';
+  const sourceFromQuery = q.get('source') || '';
+  const sessionFromQuery = q.get('session') || '';
+  const fileFromQuery = q.get('file') || '';
   if (tokenFromQuery) tokenEl.value = tokenFromQuery;
 
   restoreSettings();
@@ -615,8 +818,31 @@ async function init() {
   if (state.healthTimer) clearInterval(state.healthTimer);
   state.healthTimer = setInterval(() => pollHealth(), 4000);
 
+  await pollEthubInsights();
+  if (state.insightsTimer) clearInterval(state.insightsTimer);
+  state.insightsTimer = setInterval(() => pollEthubInsights().catch(() => {}), 4000);
+
   startClockTicker();
   await refreshSessionClock();
+
+  if (sourceFromQuery) {
+    sourceEl.value = sourceFromQuery;
+    updateSourceState();
+    await loadSessions();
+    if (sessionFromQuery) {
+      sessionEl.value = sessionFromQuery;
+      updateSourceState();
+    }
+    await loadFiles();
+    if (fileFromQuery) {
+      fileEl.value = fileFromQuery;
+      updateSourceState();
+    }
+    if (sessionEl.value && fileEl.value) {
+      await openFile();
+      setStatus(`Restored ${sourceEl.value}/${sessionEl.value}/${fileEl.value}`);
+    }
+  }
 }
 
 init().catch((err) => {

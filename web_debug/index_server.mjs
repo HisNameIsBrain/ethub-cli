@@ -3,21 +3,36 @@ import fs from 'fs';
 import path from 'path';
 import http from 'http';
 import crypto from 'crypto';
+import { fileURLToPath } from 'url';
 
 const ROOT = process.cwd();
-const HOST = process.env.WEB_DEBUG_HOST || '0.0.0.0';
+const STATIC_WEB_DEBUG_DIR = path.dirname(fileURLToPath(import.meta.url));
+const WORKSPACE_WEB_DEBUG_DIR = path.join(ROOT, 'web_debug');
+const HOST = process.env.WEB_DEBUG_HOST || '127.0.0.1';
 const START_PORT = Number(process.env.WEB_DEBUG_PORT || '3000');
-const TOKEN_FILE = path.join(ROOT, 'web_debug', '.token');
-const INDEX_HTML = path.join(ROOT, 'web_debug', 'index.html');
-const CHAT_HTML = path.join(ROOT, 'web_debug', 'chat.html');
-const OLLAMA_CHAT_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434/api/chat';
+const TOKEN_FILE = path.join(WORKSPACE_WEB_DEBUG_DIR, '.token');
+const RUNTIME_FILE = path.join(WORKSPACE_WEB_DEBUG_DIR, 'runtime.json');
+const INDEX_HTML = path.join(STATIC_WEB_DEBUG_DIR, 'index.html');
+const CHAT_HTML = path.join(STATIC_WEB_DEBUG_DIR, 'chat.html');
+const OLLAMA_CHAT_URL = process.env.OLLAMA_URL || 'http://206.189.237.213:11434/api/chat';
 const OLLAMA_TAGS_URL = process.env.OLLAMA_TAGS_URL || OLLAMA_CHAT_URL.replace(/\/api\/chat\/?$/, '/api/tags');
 
 const SOURCES = {
   ethub: path.join(ROOT, 'ethub_cli_session_logs'),
+  chat: path.join(ROOT, 'web_debug', 'chat_sessions'),
   codex: path.join(ROOT, 'codex_logs'),
   docs: path.join(ROOT, 'docs')
 };
+
+function ensureDir(dir) {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+
+ensureDir(WORKSPACE_WEB_DEBUG_DIR);
+
+for (const key of Object.keys(SOURCES)) {
+  ensureDir(SOURCES[key]);
+}
 
 function ensureToken() {
   if (process.env.WEB_DEBUG_TOKEN) return process.env.WEB_DEBUG_TOKEN;
@@ -30,6 +45,34 @@ function ensureToken() {
 const TOKEN = ensureToken();
 const SERVER_STARTED_AT = Date.now();
 let ACTIVE_PORT = START_PORT;
+
+function writeRuntimeFile(port) {
+  const payload = {
+    pid: process.pid,
+    host: HOST,
+    port,
+    token: TOKEN,
+    started_at: new Date(SERVER_STARTED_AT).toISOString(),
+    dashboard_url: `http://127.0.0.1:${port}/?token=${TOKEN}`,
+    chat_url: `http://127.0.0.1:${port}/chat?token=${TOKEN}`
+  };
+  fs.writeFileSync(RUNTIME_FILE, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+}
+
+function clearRuntimeFile() {
+  if (!fs.existsSync(RUNTIME_FILE)) return;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(RUNTIME_FILE, 'utf8'));
+    if (parsed && Number(parsed.pid) !== process.pid) return;
+  } catch {
+    // best effort cleanup
+  }
+  try {
+    fs.unlinkSync(RUNTIME_FILE);
+  } catch {
+    // ignore
+  }
+}
 
 function sendJson(res, code, obj) {
   res.writeHead(code, {
@@ -95,6 +138,71 @@ function readJsonLine(pathName, matcher) {
     }
   }
   return null;
+}
+
+function readJsonlTail(pathName, maxCount = 500) {
+  if (!fs.existsSync(pathName)) return [];
+  const raw = fs.readFileSync(pathName, 'utf8');
+  const lines = raw.split('\n').filter((line) => line.trim());
+  const out = [];
+  const start = Math.max(0, lines.length - maxCount);
+  for (let i = start; i < lines.length; i += 1) {
+    try {
+      out.push(JSON.parse(lines[i]));
+    } catch {
+      // skip malformed rows
+    }
+  }
+  return out;
+}
+
+function makeChatSessionId() {
+  const iso = new Date().toISOString().replace(/[-:.TZ]/g, '');
+  const rand = crypto.randomBytes(3).toString('hex');
+  return `chat_${iso}_${rand}`;
+}
+
+function resolveChatSessionDir(sessionId) {
+  if (!sessionId) return null;
+  const dir = safeJoin(SOURCES.chat, sessionId);
+  if (!dir) return null;
+  return dir;
+}
+
+function appendJsonl(filePath, obj) {
+  fs.appendFileSync(filePath, `${JSON.stringify(obj)}\n`, 'utf8');
+}
+
+function writeChatMeta(sessionDir, patch) {
+  const metaPath = path.join(sessionDir, 'meta.json');
+  let current = {};
+  if (fs.existsSync(metaPath)) {
+    try {
+      current = JSON.parse(fs.readFileSync(metaPath, 'utf8')) || {};
+    } catch {
+      current = {};
+    }
+  }
+  const next = { ...current, ...patch };
+  fs.writeFileSync(metaPath, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+  return next;
+}
+
+function readChatEvents(sessionDir, maxCount = 500) {
+  const eventsPath = path.join(sessionDir, 'events.jsonl');
+  if (!fs.existsSync(eventsPath)) return [];
+  const raw = fs.readFileSync(eventsPath, 'utf8');
+  const rows = raw.split('\n').filter((x) => x.trim());
+  const out = [];
+  const start = Math.max(0, rows.length - maxCount);
+  for (let i = start; i < rows.length; i += 1) {
+    try {
+      out.push(JSON.parse(rows[i]));
+    } catch {
+      // skip malformed row
+    }
+  }
+  return out;
 }
 
 function resolveSessionName(source) {
@@ -267,6 +375,99 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if (u.pathname === '/api/chat-session/start') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'method_not_allowed' });
+    const sessionId = makeChatSessionId();
+    const dir = resolveChatSessionDir(sessionId);
+    if (!dir) return sendJson(res, 500, { error: 'session_dir_invalid' });
+    ensureDir(dir);
+    const startedAt = new Date().toISOString();
+    writeChatMeta(dir, { session_id: sessionId, started_at: startedAt, ended_at: null, cleared_at: null });
+    appendJsonl(path.join(dir, 'events.jsonl'), {
+      ts: startedAt,
+      type: 'chat_session_start',
+      session_id: sessionId
+    });
+    return sendJson(res, 200, { session_id: sessionId, started_at: startedAt });
+  }
+
+  if (u.pathname === '/api/chat-session/event') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'method_not_allowed' });
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch (error) {
+      return sendJson(res, 400, { error: error && error.message ? error.message : String(error) });
+    }
+    const sessionId = String(body.session_id || '').trim();
+    const eventType = String(body.type || 'message').trim();
+    const payload = body.payload && typeof body.payload === 'object' ? body.payload : {};
+    if (!sessionId) return sendJson(res, 400, { error: 'session_id_required' });
+    const dir = resolveChatSessionDir(sessionId);
+    if (!dir) return sendJson(res, 400, { error: 'invalid_session_id' });
+    ensureDir(dir);
+    const eventsPath = path.join(dir, 'events.jsonl');
+    const ts = new Date().toISOString();
+    appendJsonl(eventsPath, {
+      ts,
+      type: eventType,
+      session_id: sessionId,
+      payload
+    });
+    if (eventType === 'message') {
+      writeChatMeta(dir, { last_event_at: ts });
+    }
+    return sendJson(res, 200, { ok: true, session_id: sessionId });
+  }
+
+  if (u.pathname === '/api/chat-session') {
+    if (req.method !== 'GET') return sendJson(res, 405, { error: 'method_not_allowed' });
+    const sessionId = String(u.searchParams.get('session_id') || '').trim();
+    if (!sessionId) return sendJson(res, 400, { error: 'session_id_required' });
+    const dir = resolveChatSessionDir(sessionId);
+    if (!dir || !fs.existsSync(dir)) return sendJson(res, 404, { error: 'session_not_found' });
+    const metaPath = path.join(dir, 'meta.json');
+    let meta = {};
+    if (fs.existsSync(metaPath)) {
+      try {
+        meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) || {};
+      } catch {
+        meta = {};
+      }
+    }
+    const events = readChatEvents(dir, 2000);
+    return sendJson(res, 200, { session_id: sessionId, meta, events });
+  }
+
+  if (u.pathname === '/api/chat-session/clear') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'method_not_allowed' });
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch (error) {
+      return sendJson(res, 400, { error: error && error.message ? error.message : String(error) });
+    }
+    const sessionId = String(body.session_id || '').trim();
+    if (!sessionId) return sendJson(res, 400, { error: 'session_id_required' });
+    const dir = resolveChatSessionDir(sessionId);
+    if (!dir || !fs.existsSync(dir)) return sendJson(res, 404, { error: 'session_not_found' });
+    const clearedAt = new Date().toISOString();
+    appendJsonl(path.join(dir, 'events.jsonl'), {
+      ts: clearedAt,
+      type: 'chat_session_cleared',
+      session_id: sessionId
+    });
+    writeChatMeta(dir, { ended_at: clearedAt, cleared_at: clearedAt });
+    const token = String(u.searchParams.get('token') || '');
+    const qs = new URLSearchParams({
+      source: 'chat',
+      session: sessionId,
+      file: 'events.jsonl'
+    });
+    if (token) qs.set('token', token);
+    return sendJson(res, 200, { ok: true, session_id: sessionId, dashboard_path: `/?${qs.toString()}` });
+  }
+
   if (u.pathname === '/api/session-status') {
     const source = u.searchParams.get('source') || 'ethub';
     let session = u.searchParams.get('session') || '';
@@ -279,6 +480,96 @@ const server = http.createServer(async (req, res) => {
       session,
       started_at: startedAt,
       elapsed_ms: elapsedMs
+    });
+  }
+
+  if (u.pathname === '/api/ethub-insights') {
+    const session = resolveSessionName('ethub');
+    if (!session) {
+      return sendJson(res, 200, {
+        ok: true,
+        session: '',
+        started_at: null,
+        skills_total: 0,
+        pending_action: null,
+        approvals: { approved: 0, rejected: 0 },
+        metrics: { mined_batches: 0, mined_candidates_total: 0, skills_added: 0, skill_runs: 0, skill_run_failures: 0 },
+        recent: []
+      });
+    }
+
+    const sessionDir = safeJoin(SOURCES.ethub, session);
+    const eventsPath = sessionDir ? path.join(sessionDir, 'events.jsonl') : '';
+    const statePath = sessionDir ? path.join(sessionDir, 'state.jsonl') : '';
+    const events = readJsonlTail(eventsPath, 2000);
+    const stateRows = readJsonlTail(statePath, 300);
+    const lastState = stateRows.length ? stateRows[stateRows.length - 1] : null;
+    const startEvent = events.find((evt) => evt && evt.type === 'session_start') || null;
+
+    let skillsTotal = 0;
+    const skillsPath = path.join(ROOT, 'ethub_cli_skills.json');
+    if (fs.existsSync(skillsPath)) {
+      try {
+        const parsed = JSON.parse(fs.readFileSync(skillsPath, 'utf8'));
+        if (parsed && Array.isArray(parsed.skills)) {
+          skillsTotal = parsed.skills.length;
+        }
+      } catch {
+        skillsTotal = 0;
+      }
+    }
+
+    let approvedCount = 0;
+    let rejectedCount = 0;
+    let minedBatches = 0;
+    let minedCandidatesTotal = 0;
+    let skillsAdded = 0;
+    let skillRuns = 0;
+    let skillRunFailures = 0;
+
+    for (const evt of events) {
+      if (!evt || typeof evt !== 'object') continue;
+      if (evt.type === 'approval') {
+        if (evt.payload && evt.payload.approved === true) approvedCount += 1;
+        if (evt.payload && evt.payload.approved === false) rejectedCount += 1;
+      }
+      if (evt.type === 'skills_mined') {
+        minedBatches += 1;
+        minedCandidatesTotal += Number((evt.payload && evt.payload.candidates) || 0);
+      }
+      if (evt.type === 'skill_added') skillsAdded += 1;
+      if (evt.type === 'skill_run_complete') {
+        skillRuns += 1;
+        const code = Number(evt.payload && evt.payload.code);
+        if (Number.isFinite(code) && code !== 0) skillRunFailures += 1;
+      }
+    }
+
+    const recent = events
+      .filter((evt) => evt && ['skills_mined', 'skill_added', 'skill_run_complete', 'approval', 'action_queued'].includes(evt.type))
+      .slice(-12)
+      .map((evt) => ({
+        ts: evt.ts || null,
+        type: evt.type,
+        payload: evt.payload || null
+      }));
+
+    return sendJson(res, 200, {
+      ok: true,
+      session,
+      started_at: startEvent && startEvent.payload ? startEvent.payload.started_at || null : null,
+      model: startEvent && startEvent.payload ? startEvent.payload.model_default || null : null,
+      skills_total: skillsTotal,
+      pending_action: lastState ? lastState.pending_action || null : null,
+      approvals: { approved: approvedCount, rejected: rejectedCount },
+      metrics: {
+        mined_batches: minedBatches,
+        mined_candidates_total: minedCandidatesTotal,
+        skills_added: skillsAdded,
+        skill_runs: skillRuns,
+        skill_run_failures: skillRunFailures
+      },
+      recent
     });
   }
 
@@ -366,6 +657,7 @@ function listenWithPortFallback(startPort, maxOffset = 20) {
 listenWithPortFallback(START_PORT, 30)
   .then((port) => {
     ACTIVE_PORT = port;
+    writeRuntimeFile(port);
     const base = `http://127.0.0.1:${ACTIVE_PORT}`;
     process.stdout.write(`web_debug running on ${base}/?token=${TOKEN}\n`);
     process.stdout.write(`chat interface: ${base}/chat?token=${TOKEN}\n`);
@@ -375,3 +667,17 @@ listenWithPortFallback(START_PORT, 30)
     process.stderr.write(`web_debug server error: ${msg}\n`);
     process.exit(1);
   });
+
+process.on('SIGINT', () => {
+  clearRuntimeFile();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  clearRuntimeFile();
+  process.exit(0);
+});
+
+process.on('exit', () => {
+  clearRuntimeFile();
+});

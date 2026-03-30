@@ -1,0 +1,3 @@
+{"ts":"2026-03-27T05:23:00.568Z","type":"chat_session_start","session_id":"chat_20260327052300567_03cd73"}
+{"ts":"2026-03-27T05:23:06.078Z","type":"message","session_id":"chat_20260327052300567_03cd73","payload":{"role":"user","content":"Test"}}
+{"ts":"2026-03-27T05:23:09.687Z","type":"message","session_id":"chat_20260327052300567_03cd73","payload":{"role":"assistant","content":"Hello! How can I assist you today? Feel free to ask me any questions or share your request.","model":"qwen2.5:0.5b"}}
