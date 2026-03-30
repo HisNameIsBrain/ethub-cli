@@ -1,0 +1,701 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const readline = require('readline');
+
+const APP_NAME = 'ethub-cli-agent';
+const DEFAULT_OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434/api/chat';
+const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:0.5b';
+const LOG_ROOT = path.join(process.cwd(), 'ethub_cli_session_logs');
+const CHANGE_LOG_ROOT = path.join(process.cwd(), 'ethub_cli_change_logs');
+const ETHUB_ASCII = [
+  "oooooooooooo ooooooooooooo ooooo   ooooo ooooo     ooo oooooooooo.",
+  "`888'     `8 8'   888   `8 `888'   `888' `888'     `8' `888'   `Y8b",
+  " 888              888       888     888   888       8   888     888",
+  " 888oooo8         888       888ooooo888   888       8   888oooo888'",
+  " 888              888       888     888   888       8   888    `88b",
+  " 888       o      888       888     888   `88.    .8'   888    .88P",
+  "o888ooooood8     o888o     o888o   o888o    `YbodP'    o888bood8P'"
+];
+const DIVIDER_CHARS = ['━', '─', '═', '╌'];
+const SUGGESTIONS = [
+  'Summarize the last answer in 3 bullets.',
+  'Review this shell command for safety.',
+  'Draft a concise changelog entry.'
+];
+const LEFT_PAD = '  ';
+const HEADER_WIDTH = 76;
+const ANSI_ENABLED = process.stdout.isTTY && !process.env.NO_COLOR;
+const ANSI = {
+  reset: '\x1b[0m',
+  bold: '\x1b[1m',
+  dim: '\x1b[2m',
+  cyan: '\x1b[36m',
+  magenta: '\x1b[35m',
+  yellow: '\x1b[33m',
+  red: '\x1b[31m'
+};
+
+function style(text, ...codes) {
+  if (!ANSI_ENABLED || !codes.length) return String(text);
+  return `${codes.join('')}${text}${ANSI.reset}`;
+}
+
+function rgb(text, r, g, b) {
+  if (!ANSI_ENABLED) return String(text);
+  return `\x1b[38;2;${r};${g};${b}m${text}${ANSI.reset}`;
+}
+
+function hslToRgb(h, s, l) {
+  h /= 360;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => {
+    const k = (n + h * 12) % 12;
+    const c = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(c * 255);
+  };
+  return { r: f(0), g: f(8), b: f(4) };
+}
+
+function rainbowDivider(width, phase) {
+  let out = '';
+  for (let i = 0; i < width; i += 1) {
+    const ch = DIVIDER_CHARS[i % DIVIDER_CHARS.length];
+    const p = (i / width + phase) % 1;
+    const { r, g, b } = hslToRgb(p * 360, 0.6, 0.65);
+    out += rgb(ch, r, g, b);
+  }
+  return out;
+}
+
+function rainbowAsciiLine(line, row, totalRows, frame) {
+  let out = '';
+  const len = Math.max(line.length, 1);
+
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (ch === ' ') {
+      out += ' ';
+      continue;
+    }
+
+    const phase = (i / len + row / totalRows + frame * 0.01) % 1;
+    const { r, g, b } = hslToRgb(phase * 360, 0.6, 0.65);
+
+    let display = ch;
+    if ((ch === 'o' || ch === '8') && (frame + i + row) % 47 === 0) {
+      display = '+';
+    }
+
+    out += rgb(display, r, g, b);
+  }
+
+  return out;
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function ensureDir(dirPath) {
+  fs.mkdirSync(dirPath, { recursive: true });
+}
+
+function safeJson(value) {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return JSON.stringify({ unserializable: true, type: typeof value });
+  }
+}
+
+function summarizeReasoning(input) {
+  const raw = String(input || '').trim();
+  const lowered = raw.toLowerCase();
+  const keywords = raw
+    .split(/\s+/)
+    .map((w) => w.replace(/[^a-zA-Z0-9_-]/g, ''))
+    .filter(Boolean)
+    .slice(0, 12);
+
+  let intent = 'general_request';
+  if (/error|syntax|stack|trace|bug|fix|crash/.test(lowered)) intent = 'debugging';
+  else if (/how|what|why|explain|guide|tutorial/.test(lowered)) intent = 'information_lookup';
+  else if (/build|create|make|implement|write/.test(lowered)) intent = 'implementation';
+
+  let strategy = 'Use local conversation context then query Ollama for a grounded response.';
+  if (intent === 'debugging') {
+    strategy = 'Focus on likely fault points, propose checks, and request missing runtime details if needed.';
+  }
+
+  return {
+    query: raw,
+    intent,
+    keywords,
+    strategy,
+    note: 'Detailed private chain-of-thought is not exposed; this is a concise decision summary.'
+  };
+}
+
+class SessionLogger {
+  constructor(rootDir) {
+    ensureDir(rootDir);
+    ensureDir(CHANGE_LOG_ROOT);
+    this.rootDir = rootDir;
+    this.sessionId = this.buildSessionId();
+    this.sessionDir = path.join(this.rootDir, this.sessionId);
+    ensureDir(this.sessionDir);
+
+    this.eventsPath = path.join(this.sessionDir, 'events.jsonl');
+    this.transcriptPath = path.join(this.sessionDir, 'transcript.md');
+    this.statePath = path.join(this.sessionDir, 'state.jsonl');
+    this.structuredPath = path.join(this.sessionDir, 'structured_history.jsonl');
+    this.latestPath = path.join(this.rootDir, 'LATEST_SESSION.txt');
+    this.changeLogPath = path.join(CHANGE_LOG_ROOT, `${this.sessionId}_changes.log`);
+
+    this.counter = 0;
+    fs.writeFileSync(this.latestPath, `${this.sessionId}\n`, 'utf8');
+    fs.writeFileSync(
+      this.transcriptPath,
+      `# ETHUB CLI Session\n\n- session_id: ${this.sessionId}\n- started_at: ${nowIso()}\n- cwd: ${process.cwd()}\n- ollama_url: ${DEFAULT_OLLAMA_URL}\n- model_default: ${DEFAULT_MODEL}\n\n`,
+      'utf8'
+    );
+    this.writeCodeSnapshot();
+
+    this.writeEvent('session_start', {
+      app: APP_NAME,
+      started_at: nowIso(),
+      session_dir: this.sessionDir,
+      cwd: process.cwd(),
+      node: process.version,
+      platform: `${os.platform()} ${os.release()}`,
+      ollama_url: DEFAULT_OLLAMA_URL,
+      model_default: DEFAULT_MODEL
+    });
+  }
+
+  buildSessionId() {
+    const d = new Date();
+    const stamp = [
+      d.getUTCFullYear(),
+      String(d.getUTCMonth() + 1).padStart(2, '0'),
+      String(d.getUTCDate()).padStart(2, '0'),
+      '_',
+      String(d.getUTCHours()).padStart(2, '0'),
+      String(d.getUTCMinutes()).padStart(2, '0'),
+      String(d.getUTCSeconds()).padStart(2, '0'),
+      '_',
+      String(d.getUTCMilliseconds()).padStart(3, '0')
+    ].join('');
+    return `session_${stamp}`;
+  }
+
+  writeEvent(type, payload) {
+    this.counter += 1;
+    const event = {
+      index: this.counter,
+      ts: nowIso(),
+      type,
+      payload
+    };
+    fs.appendFileSync(this.eventsPath, `${safeJson(event)}\n`, 'utf8');
+  }
+
+  writeTranscript(role, content) {
+    const text = String(content || '').trimEnd();
+    const block = `\n## ${role} @ ${nowIso()}\n\n${text}\n`;
+    fs.appendFileSync(this.transcriptPath, block, 'utf8');
+  }
+
+  writeState(state) {
+    fs.appendFileSync(this.statePath, `${safeJson(state)}\n`, 'utf8');
+  }
+
+  writeStructuredRecord(record) {
+    fs.appendFileSync(this.structuredPath, `${safeJson(record)}\n`, 'utf8');
+  }
+
+  writeCodeSnapshot() {
+    const sourcePath = path.resolve(__filename);
+    let sourceText = '';
+    try {
+      sourceText = fs.readFileSync(sourcePath, 'utf8');
+    } catch (error) {
+      sourceText = `Unable to read source file: ${error && error.message ? error.message : String(error)}`;
+    }
+
+    const numbered = sourceText
+      .split('\n')
+      .map((line, i) => `${String(i + 1).padStart(4, '0')}: ${line}`)
+      .join('\n');
+
+    const header =
+      `# ETHUB CLI Change Log\n` +
+      `session_id: ${this.sessionId}\n` +
+      `created_at: ${nowIso()}\n` +
+      `source_file: ${sourcePath}\n` +
+      `note: New file per session, append-only event/state logs enabled.\n\n` +
+      `## Source Snapshot (Line Numbered)\n`;
+
+    fs.writeFileSync(this.changeLogPath, `${header}${numbered}\n`, 'utf8');
+  }
+}
+
+class EthubCliAgent {
+  constructor() {
+    this.logger = new SessionLogger(LOG_ROOT);
+    this.model = DEFAULT_MODEL;
+    this.ollamaUrl = DEFAULT_OLLAMA_URL;
+    this.requireApproval = false;
+    this.history = [];
+    this.pendingAction = null;
+    this.actionMeta = {};
+    this.thinkingTimer = null;
+    this.isClosed = false;
+
+    this.rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+      prompt: style('ethub> ', ANSI.bold, ANSI.cyan)
+    });
+
+    this.logger.writeEvent('config', {
+      require_approval: this.requireApproval,
+      model: this.model,
+      ollama_url: this.ollamaUrl,
+      commands: ['/help', '/status', '/model <name>', '/approve changes on|off', '/yes', '/no', '/exit']
+    });
+
+    this.flushState();
+  }
+
+  flushState() {
+    this.logger.writeState({
+      ts: nowIso(),
+      model: this.model,
+      ollama_url: this.ollamaUrl,
+      require_approval: this.requireApproval,
+      history_count: this.history.length,
+      pending_action: this.pendingAction
+    });
+  }
+
+  async start() {
+    if (ANSI_ENABLED && process.stdout.isTTY) {
+      await this.animateHeader(1200, 20);
+    } else {
+      this.drawHeader(0);
+    }
+    this.print(style('ETHUB CLI Agent started. Ollama only, no external dependencies.', ANSI.bold, ANSI.cyan));
+    this.print(style(`Session logs: ${this.logger.sessionDir}`, ANSI.dim));
+    this.print(style('Type /help for commands.', ANSI.yellow));
+    await this.showSuggestions();
+    this.safePrompt();
+
+    this.rl.on('line', async (line) => {
+      const input = String(line || '').trim();
+      this.logger.writeEvent('stdin', { raw: line, trimmed: input });
+
+      if (!input) {
+        this.rl.prompt();
+        return;
+      }
+
+      try {
+        if (input.startsWith('/')) {
+          await this.handleCommand(input);
+        } else {
+          await this.handleUserPrompt(input);
+        }
+      } catch (error) {
+        const message = error && error.message ? error.message : String(error);
+        this.print(`${style('Error:', ANSI.bold, ANSI.red)} ${message}`);
+        this.logger.writeEvent('runtime_error', { message, stack: error && error.stack ? error.stack : null });
+      }
+
+      this.flushState();
+      this.safePrompt();
+    });
+
+    this.rl.on('close', () => {
+      this.isClosed = true;
+      this.logger.writeEvent('session_end', { ended_at: nowIso() });
+      process.stdout.write('\nSession closed.\n');
+      process.exit(0);
+    });
+  }
+
+  print(text) {
+    process.stdout.write(`${text}\n`);
+    this.logger.writeEvent('stdout', { text });
+  }
+
+  safePrompt() {
+    if (this.isClosed) return;
+    try {
+      this.rl.prompt();
+    } catch (error) {
+      const message = error && error.message ? error.message : String(error);
+      if (!/readline was closed/i.test(message)) {
+        throw error;
+      }
+      this.isClosed = true;
+    }
+  }
+
+  printBanner() {
+    for (const line of ETHUB_ASCII) {
+      this.print(style(line, ANSI.magenta));
+    }
+  }
+
+  drawHeader(frame) {
+    const p1 = (frame / 90) % 1;
+    const p3 = (p1 + 0.66) % 1;
+    this.print(LEFT_PAD + rainbowDivider(HEADER_WIDTH, p1));
+    ETHUB_ASCII.forEach((line, row) => {
+      this.print(LEFT_PAD + rainbowAsciiLine(line, row, ETHUB_ASCII.length, frame));
+    });
+    this.print(
+      LEFT_PAD +
+      style(`Mode: CHAT | Model: ${this.model} | Change Approval: ${this.requireApproval ? 'ON' : 'OFF'}`, ANSI.dim)
+    );
+    this.print(LEFT_PAD + rainbowDivider(HEADER_WIDTH, p3));
+  }
+
+  renderHeaderFrame(frame) {
+    const p1 = (frame / 90) % 1;
+    const p3 = (p1 + 0.66) % 1;
+    const lines = [];
+    lines.push(LEFT_PAD + rainbowDivider(HEADER_WIDTH, p1));
+    ETHUB_ASCII.forEach((line, row) => {
+      lines.push(LEFT_PAD + rainbowAsciiLine(line, row, ETHUB_ASCII.length, frame));
+    });
+    lines.push(
+      LEFT_PAD +
+      style(`Mode: CHAT | Model: ${this.model} | Approval: ${this.requireApproval ? 'ON' : 'OFF'}`, ANSI.dim)
+    );
+    lines.push(LEFT_PAD + rainbowDivider(HEADER_WIDTH, p3));
+    return lines;
+  }
+
+  async animateHeader(durationMs = 1200, fps = 20) {
+    const frameDelay = Math.max(16, Math.floor(1000 / fps));
+    const frames = Math.max(1, Math.floor(durationMs / frameDelay));
+    for (let frame = 0; frame < frames; frame += 1) {
+      const lines = this.renderHeaderFrame(frame);
+      process.stdout.write('\x1b[2J\x1b[H');
+      process.stdout.write(`${lines.join('\n')}\n`);
+      await new Promise((resolve) => setTimeout(resolve, frameDelay));
+    }
+    process.stdout.write('\x1b[2J\x1b[H');
+    this.drawHeader(frames);
+  }
+
+  async showSuggestions() {
+    this.print('');
+    this.print(LEFT_PAD + style('Suggestions (you can just start typing):', ANSI.dim));
+    for (const s of SUGGESTIONS) {
+      let buf = '';
+      for (const ch of s) {
+        buf += ch;
+        process.stdout.write(`\r${LEFT_PAD}${style(`• ${buf}`, ANSI.dim)}`);
+        await new Promise((resolve) => setTimeout(resolve, 12));
+      }
+      process.stdout.write('\n');
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+    this.print('');
+  }
+
+  startThinking() {
+    if (this.thinkingTimer) return;
+    let i = 0;
+    this.thinkingTimer = setInterval(() => {
+      const dots = '.'.repeat(i % 4);
+      process.stdout.write(
+        `\r${LEFT_PAD}${style('Thinking', ANSI.cyan)}${dots.padEnd(3, ' ')}${style(' parsing your request', ANSI.dim)}${' '.repeat(20)}`
+      );
+      i += 1;
+    }, 140);
+  }
+
+  stopThinking() {
+    if (!this.thinkingTimer) return;
+    clearInterval(this.thinkingTimer);
+    this.thinkingTimer = null;
+    process.stdout.write('\n');
+  }
+
+  async handleCommand(input) {
+    const [cmd, ...args] = input.split(/\s+/);
+    const command = cmd.toLowerCase();
+    this.logger.writeEvent('subcommand', { command, args });
+
+    if (command === '/help') {
+      this.print('Commands: /help, /status, /model <name>, /approve changes on|off, /yes, /no, /exit');
+      return;
+    }
+
+    if (command === '/status') {
+      this.print(safeJson({
+        model: this.model,
+        ollama_url: this.ollamaUrl,
+        require_approval_for_changes: this.requireApproval,
+        history_count: this.history.length,
+        pending_action: this.pendingAction ? this.pendingAction.id : null
+      }));
+      return;
+    }
+
+    if (command === '/model') {
+      const nextModel = args.join(' ').trim();
+      if (!nextModel) {
+        this.print(`Current model: ${this.model}`);
+        return;
+      }
+      this.model = nextModel;
+      this.print(`Model updated: ${this.model}`);
+      this.logger.writeEvent('config_update', { key: 'model', value: this.model });
+      return;
+    }
+
+    if (command === '/approve') {
+      const target = (args[0] || '').toLowerCase();
+      const mode = (args[1] || '').toLowerCase();
+      const legacyMode = target;
+
+      if (target === 'changes' && (mode === 'on' || mode === 'off')) {
+        this.requireApproval = mode === 'on';
+        this.print(`Change approval mode: ${mode}`);
+        this.logger.writeEvent('config_update', { key: 'require_approval_for_changes', value: this.requireApproval });
+        return;
+      }
+
+      if (legacyMode === 'on' || legacyMode === 'off') {
+        this.requireApproval = legacyMode === 'on';
+        this.print(`Change approval mode: ${legacyMode}`);
+        this.logger.writeEvent('config_update', { key: 'require_approval_for_changes', value: this.requireApproval });
+        return;
+      }
+
+      if (!target) {
+        this.print(`Change approval mode: ${this.requireApproval ? 'on' : 'off'}`);
+        return;
+      }
+
+      this.print('Usage: /approve changes on|off');
+      return;
+    }
+
+    if (command === '/yes') {
+      if (!this.pendingAction) {
+        this.print('No pending action to approve.');
+        return;
+      }
+      const action = this.pendingAction;
+      this.pendingAction = null;
+      this.logger.writeEvent('approval', { action_id: action.id, approved: true });
+      this.writeStructuredUpdate(action.id, {
+        'Print-approved-by-user?': 'true',
+        approved: true
+      });
+      await this.executeAction(action);
+      return;
+    }
+
+    if (command === '/no') {
+      if (!this.pendingAction) {
+        this.print('No pending action to reject.');
+        return;
+      }
+      const action = this.pendingAction;
+      this.pendingAction = null;
+      this.logger.writeEvent('approval', { action_id: action.id, approved: false });
+      this.writeStructuredUpdate(action.id, {
+        'Print-approved-by-user?': 'false',
+        approved: false,
+        summary: 'Action was rejected by user before runtime execution.',
+        'Run runtime look at logs': 'skipped (approval rejected)'
+      });
+      this.print(`Action ${action.id} skipped.`);
+      return;
+    }
+
+    if (command === '/exit') {
+      this.rl.close();
+      return;
+    }
+
+    this.print(`Unknown command: ${command}. Use /help.`);
+  }
+
+  async handleUserPrompt(input) {
+    const reasoning = summarizeReasoning(input);
+    const action = {
+      id: `act_${Date.now()}`,
+      type: 'ollama_chat',
+      prompt: input,
+      reasoning_summary: reasoning,
+      created_at: nowIso()
+    };
+
+    this.logger.writeTranscript('User', input);
+    this.logger.writeEvent('user_prompt', {
+      text: input,
+      reasoning_summary: reasoning,
+      proposed_action: { id: action.id, type: action.type }
+    });
+    this.actionMeta[action.id] = {
+      prompt: input,
+      prompt_chars_before: input.length
+    };
+
+    this.logger.writeStructuredRecord({
+      timestamp: nowIso(),
+      query: input,
+      reasoning: {
+        query: reasoning.query,
+        intent: reasoning.intent,
+        keywords: reasoning.keywords,
+        search_strategy: reasoning.strategy
+      },
+      actions: {
+        action: 'local_ollama_request',
+        sources: ['ollama_localhost'],
+        Context: 'Analyzing locally via Ollama only; no OpenAI/Gemini/external model APIs.'
+      },
+      Commands: "ls, grep, nano, cd, nano 'create-new-file-diff-snippet-number+1.sh', regen entire file with changes then save, cp -rf old/path/to/file move/to/backup/path/file, rm old/path/to/file, bash create-new-file-(diff-snippet-line:character)-(number)+1, sed -i 's/old/new' \"$file\"",
+      Diff: '+,-',
+      Path: 'path/to/file:line:character',
+      action_id: action.id,
+      'Print-approved-by-user?': 'not_required (run commands)',
+      'Run runtime look at logs': 'pending',
+      summary: 'pending',
+      'Number of characters changed': 'pending'
+    });
+
+    await this.executeAction(action);
+  }
+
+  writeStructuredUpdate(actionId, patch) {
+    this.logger.writeStructuredRecord({
+      timestamp: nowIso(),
+      action_id: actionId,
+      update: patch
+    });
+  }
+
+  async executeAction(action) {
+    if (!action || action.type !== 'ollama_chat') {
+      this.logger.writeEvent('action_error', { message: 'Unsupported action type', action });
+      this.writeStructuredUpdate(action && action.id ? action.id : 'unknown', {
+        'Run runtime look at logs': 'contains error still, unsupported action type',
+        summary: 'Unsupported action type encountered before runtime request.',
+        'Number of characters changed': 'previous character amount in file before cmd/new total character count added: 0/0'
+      });
+      this.print('Unsupported action.');
+      return;
+    }
+
+    this.logger.writeEvent('action_start', {
+      action_id: action.id,
+      type: action.type,
+      target: this.ollamaUrl,
+      model: this.model,
+      prompt_chars: action.prompt.length,
+      reasoning_summary: action.reasoning_summary
+    });
+
+    this.history.push({ role: 'user', content: action.prompt });
+
+    const payload = {
+      model: this.model,
+      messages: this.history,
+      stream: false
+    };
+
+    let response;
+    let raw;
+    const started = Date.now();
+    this.startThinking();
+
+    try {
+      response = await fetch(this.ollamaUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      raw = await response.text();
+    } catch (error) {
+      this.stopThinking();
+      const message = error && error.message ? error.message : String(error);
+      this.logger.writeEvent('action_failure', {
+        action_id: action.id,
+        duration_ms: Date.now() - started,
+        error: message
+      });
+      this.writeStructuredUpdate(action.id, {
+        'Run runtime look at logs': 'contains error still, loop and try again with different results until each individual error is clear.',
+        summary: `Runtime request failed. Error: ${message}`,
+        'Number of characters changed': `previous character amount in file before cmd/new total character count added: ${action.prompt.length}/0`,
+        'Print-approved-by-user?': 'true'
+      });
+      this.print(`Ollama request failed: ${message}`);
+      return;
+    }
+    this.stopThinking();
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
+    }
+
+    const assistantText = parsed && parsed.message && parsed.message.content
+      ? String(parsed.message.content)
+      : raw;
+
+    this.history.push({ role: 'assistant', content: assistantText });
+
+    this.logger.writeEvent('action_result', {
+      action_id: action.id,
+      duration_ms: Date.now() - started,
+      http_status: response.status,
+      ok: response.ok,
+      response_preview: assistantText.slice(0, 400),
+      response_chars: assistantText.length
+    });
+
+    this.logger.writeTranscript('Assistant', assistantText);
+    this.print(assistantText);
+
+    const hasRuntimeError = /(syntaxerror|stack overflow|runtime error|error:)/i.test(assistantText);
+    const runtimeResult = hasRuntimeError
+      ? 'contains error still, retry with different checks until isolated'
+      : 'No runtime error anymore = fixed';
+    const beforeChars = this.actionMeta[action.id] && this.actionMeta[action.id].prompt_chars_before
+      ? this.actionMeta[action.id].prompt_chars_before
+      : 0;
+    const afterChars = assistantText.length;
+    const elapsedMs = Date.now() - started;
+
+    this.writeStructuredUpdate(action.id, {
+      'Run runtime look at logs': runtimeResult,
+      summary: `summarized what just changed, is it fixed: ${hasRuntimeError ? 'No' : 'Yes'}. Runtime error count estimate: ${hasRuntimeError ? 1 : 0}.`,
+      'Number of characters changed': `previous character amount in file before cmd/new total character count added: ${beforeChars}/${afterChars}`,
+      timing_ms: elapsedMs,
+      stop_condition: elapsedMs >= 300000 ? 'Unable to find results or solutions, Try again.' : 'within loop budget'
+    });
+  }
+}
+
+const agent = new EthubCliAgent();
+agent.start().catch((error) => {
+  process.stderr.write(`Fatal startup error: ${error && error.stack ? error.stack : String(error)}\n`);
+  process.exit(1);
+});
