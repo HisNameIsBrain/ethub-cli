@@ -1,0 +1,1750 @@
+# ETHUB CLI Change Log
+session_id: session_20260331_023903_656
+created_at: 2026-03-31T02:39:03.659Z
+source_file: /root/ethub-cli/src/cli/ethub_cli.js
+note: New file per session, append-only event/state logs enabled.
+
+## Source Snapshot (Line Numbered)
+0001: #!/usr/bin/env node
+0002: 
+0003: const fs = require('fs');
+0004: const path = require('path');
+0005: const os = require('os');
+0006: const readline = require('readline');
+0007: const zlib = require('zlib');
+0008: const { spawn } = require('child_process');
+0009: 
+0010: const APP_NAME = 'ethub-cli-agent';
+0011: const APP_ROOT = path.resolve(__dirname, '..', '..');
+0012: const DEFAULT_OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434/api/chat';
+0013: const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:0.5b';
+0014: const INITIAL_CWD = process.cwd();
+0015: const LOG_ROOT = path.join(process.cwd(), 'ethub_cli_session_logs');
+0016: const CHANGE_LOG_ROOT = path.join(process.cwd(), 'ethub_cli_change_logs');
+0017: const SKILLS_PATH = path.join(process.cwd(), 'ethub_cli_skills.json');
+0018: const ARTIFACTS_ROOT = path.join(process.cwd(), 'artifacts');
+0019: const WEB_DEBUG_SERVER_PATH = path.join(APP_ROOT, 'web_debug', 'index_server.mjs');
+0020: const WEB_DEBUG_RUNTIME_PATH = path.join(process.cwd(), 'web_debug', 'runtime.json');
+0021: const MAX_SKILL_SNIPPET_CHARS = 12000;
+0022: const MAX_SKILL_CANDIDATES = 100;
+0023: const MAX_COMMAND_OUTPUT_BYTES = 64 * 1024;
+0024: const SAFE_SKILL_COMMANDS = new Set([
+0025:   'ls',
+0026:   'pwd',
+0027:   'cat',
+0028:   'head',
+0029:   'tail',
+0030:   'wc',
+0031:   'rg',
+0032:   'grep',
+0033:   'find',
+0034:   'sed',
+0035:   'cp',
+0036:   'mv',
+0037:   'mkdir',
+0038:   'touch',
+0039:   'echo',
+0040:   'sort',
+0041:   'uniq',
+0042:   'cut',
+0043:   'diff',
+0044:   'unzip',
+0045:   'zip',
+0046:   'tar',
+0047:   'git'
+0048: ]);
+0049: const TEXT_EXTENSIONS = new Set([
+0050:   '.json',
+0051:   '.md',
+0052:   '.txt',
+0053:   '.sh',
+0054:   '.bash',
+0055:   '.zsh',
+0056:   '.js',
+0057:   '.mjs',
+0058:   '.cjs',
+0059:   '.ts',
+0060:   '.tsx',
+0061:   '.jsx',
+0062:   '.py',
+0063:   '.go',
+0064:   '.rs',
+0065:   '.java',
+0066:   '.rb',
+0067:   '.php',
+0068:   '.html',
+0069:   '.css',
+0070:   '.yml',
+0071:   '.yaml',
+0072:   '.toml',
+0073:   '.ini',
+0074:   '.cfg',
+0075:   '.sql'
+0076: ]);
+0077: const BLOCKED_COMMAND_PATTERN = /[`|&;<>]/;
+0078: const ETHUB_ASCII = [
+0079:   "oooooooooooo ooooooooooooo ooooo   ooooo ooooo     ooo oooooooooo.",
+0080:   "`888'     `8 8'   888   `8 `888'   `888' `888'     `8' `888'   `Y8b",
+0081:   " 888              888       888     888   888       8   888     888",
+0082:   " 888oooo8         888       888ooooo888   888       8   888oooo888'",
+0083:   " 888              888       888     888   888       8   888    `88b",
+0084:   " 888       o      888       888     888   `88.    .8'   888    .88P",
+0085:   "o888ooooood8     o888o     o888o   o888o    `YbodP'    o888bood8P'"
+0086: ];
+0087: const DIVIDER_CHARS = ['-', '=', '~', '-'];
+0088: const SUGGESTIONS = [
+0089:   'Summarize the last answer in 3 bullets.',
+0090:   'Review this shell command for safety.',
+0091:   'Draft a concise changelog entry.'
+0092: ];
+0093: const LEFT_PAD = '  ';
+0094: const HEADER_WIDTH = 76;
+0095: const MAX_READFILE_BYTES = 64 * 1024;
+0096: const ANSI_ENABLED = process.stdout.isTTY && !process.env.NO_COLOR;
+0097: const ANSI = {
+0098:   reset: '\x1b[0m',
+0099:   bold: '\x1b[1m',
+0100:   dim: '\x1b[2m',
+0101:   cyan: '\x1b[36m',
+0102:   magenta: '\x1b[35m',
+0103:   yellow: '\x1b[33m',
+0104:   red: '\x1b[31m'
+0105: };
+0106: 
+0107: function style(text, ...codes) {
+0108:   if (!ANSI_ENABLED || !codes.length) return String(text);
+0109:   return `${codes.join('')}${text}${ANSI.reset}`;
+0110: }
+0111: 
+0112: function rgb(text, r, g, b) {
+0113:   if (!ANSI_ENABLED) return String(text);
+0114:   return `\x1b[38;2;${r};${g};${b}m${text}${ANSI.reset}`;
+0115: }
+0116: 
+0117: function hslToRgb(h, s, l) {
+0118:   h /= 360;
+0119:   const a = s * Math.min(l, 1 - l);
+0120:   const f = (n) => {
+0121:     const k = (n + h * 12) % 12;
+0122:     const c = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+0123:     return Math.round(c * 255);
+0124:   };
+0125:   return { r: f(0), g: f(8), b: f(4) };
+0126: }
+0127: 
+0128: function rainbowDivider(width, phase) {
+0129:   let out = '';
+0130:   for (let i = 0; i < width; i += 1) {
+0131:     const ch = DIVIDER_CHARS[i % DIVIDER_CHARS.length];
+0132:     const p = (i / width + phase) % 1;
+0133:     const { r, g, b } = hslToRgb(p * 360, 0.6, 0.65);
+0134:     out += rgb(ch, r, g, b);
+0135:   }
+0136:   return out;
+0137: }
+0138: 
+0139: function rainbowAsciiLine(line, row, totalRows, frame) {
+0140:   let out = '';
+0141:   const len = Math.max(line.length, 1);
+0142: 
+0143:   for (let i = 0; i < line.length; i += 1) {
+0144:     const ch = line[i];
+0145:     if (ch === ' ') {
+0146:       out += ' ';
+0147:       continue;
+0148:     }
+0149: 
+0150:     const phase = (i / len + row / totalRows + frame * 0.01) % 1;
+0151:     const { r, g, b } = hslToRgb(phase * 360, 0.6, 0.65);
+0152: 
+0153:     let display = ch;
+0154:     if ((ch === 'o' || ch === '8') && (frame + i + row) % 47 === 0) {
+0155:       display = '+';
+0156:     }
+0157: 
+0158:     out += rgb(display, r, g, b);
+0159:   }
+0160: 
+0161:   return out;
+0162: }
+0163: 
+0164: function nowIso() {
+0165:   return new Date().toISOString();
+0166: }
+0167: 
+0168: function ensureDir(dirPath) {
+0169:   fs.mkdirSync(dirPath, { recursive: true });
+0170: }
+0171: 
+0172: function truncateText(input, maxLen) {
+0173:   const text = String(input || '');
+0174:   if (text.length <= maxLen) return text;
+0175:   return `${text.slice(0, maxLen)}\n...[truncated]`;
+0176: }
+0177: 
+0178: function safeJson(value) {
+0179:   try {
+0180:     return JSON.stringify(value);
+0181:   } catch {
+0182:     return JSON.stringify({ unserializable: true, type: typeof value });
+0183:   }
+0184: }
+0185: 
+0186: function isLikelyTextPath(filePath) {
+0187:   const ext = path.extname(filePath).toLowerCase();
+0188:   if (TEXT_EXTENSIONS.has(ext)) return true;
+0189:   const base = path.basename(filePath).toLowerCase();
+0190:   if (base.startsWith('conversations-') && base.endsWith('.json')) return true;
+0191:   if (base === 'chat.html' || base === 'export_manifest.json') return true;
+0192:   return false;
+0193: }
+0194: 
+0195: function normalizeSnippet(value) {
+0196:   return String(value || '').replace(/\r\n/g, '\n').trim();
+0197: }
+0198: 
+0199: function looksLikeUsefulSnippet(snippet) {
+0200:   const s = normalizeSnippet(snippet);
+0201:   if (!s || s.length < 8) return false;
+0202:   const lowered = s.toLowerCase();
+0203:   if (lowered.includes('user profile is shown') || lowered.includes('before answering, quietly think')) return false;
+0204:   if (s.length > MAX_SKILL_SNIPPET_CHARS) return false;
+0205:   if (/^(ls|pwd|cat|head|tail|wc|rg|grep|find|sed|cp|mv|mkdir|touch|echo|git)\b/.test(s)) return true;
+0206:   if (/[{};$]|=>|function\s|\bconst\s|\blet\s|\bclass\s|\bimport\s|\bexport\s|#!/.test(s)) return true;
+0207:   if (/<[a-zA-Z][^>]*>[\s\S]*<\/[a-zA-Z]+>/.test(s)) return true;
+0208:   return false;
+0209: }
+0210: 
+0211: function tokenizeCommandLine(input) {
+0212:   const text = String(input || '');
+0213:   const tokens = [];
+0214:   let current = '';
+0215:   let quote = null;
+0216:   let escaping = false;
+0217: 
+0218:   for (let i = 0; i < text.length; i += 1) {
+0219:     const ch = text[i];
+0220:     if (escaping) {
+0221:       current += ch;
+0222:       escaping = false;
+0223:       continue;
+0224:     }
+0225:     if (ch === '\\') {
+0226:       escaping = true;
+0227:       continue;
+0228:     }
+0229:     if (quote) {
+0230:       if (ch === quote) {
+0231:         quote = null;
+0232:       } else {
+0233:         current += ch;
+0234:       }
+0235:       continue;
+0236:     }
+0237:     if (ch === '"' || ch === '\'') {
+0238:       quote = ch;
+0239:       continue;
+0240:     }
+0241:     if (/\s/.test(ch)) {
+0242:       if (current) {
+0243:         tokens.push(current);
+0244:         current = '';
+0245:       }
+0246:       continue;
+0247:     }
+0248:     current += ch;
+0249:   }
+0250: 
+0251:   if (escaping) return { error: 'Command cannot end with a trailing escape.' };
+0252:   if (quote) return { error: 'Unclosed quote in command.' };
+0253:   if (current) tokens.push(current);
+0254:   return { tokens };
+0255: }
+0256: 
+0257: function isPathInsideRoot(workspaceRoot, candidatePath) {
+0258:   const root = path.resolve(workspaceRoot);
+0259:   const resolved = path.resolve(candidatePath);
+0260:   return resolved === root || resolved.startsWith(`${root}${path.sep}`);
+0261: }
+0262: 
+0263: function extractTextEntriesFromZip(zipPath, shouldInclude) {
+0264:   const out = [];
+0265:   const data = fs.readFileSync(zipPath);
+0266:   const minEocd = 22;
+0267:   const maxComment = 0xffff;
+0268:   const startSearch = Math.max(0, data.length - (minEocd + maxComment));
+0269:   let eocd = -1;
+0270:   for (let i = data.length - minEocd; i >= startSearch; i -= 1) {
+0271:     if (data.readUInt32LE(i) === 0x06054b50) {
+0272:       eocd = i;
+0273:       break;
+0274:     }
+0275:   }
+0276:   if (eocd < 0) throw new Error('zip EOCD signature not found');
+0277: 
+0278:   const centralDirSize = data.readUInt32LE(eocd + 12);
+0279:   const centralDirOffset = data.readUInt32LE(eocd + 16);
+0280:   const centralDirEnd = centralDirOffset + centralDirSize;
+0281:   let cursor = centralDirOffset;
+0282: 
+0283:   while (cursor + 46 <= centralDirEnd && cursor + 46 <= data.length) {
+0284:     const sig = data.readUInt32LE(cursor);
+0285:     if (sig !== 0x02014b50) break;
+0286:     const compressionMethod = data.readUInt16LE(cursor + 10);
+0287:     const compressedSize = data.readUInt32LE(cursor + 20);
+0288:     const fileNameLen = data.readUInt16LE(cursor + 28);
+0289:     const extraLen = data.readUInt16LE(cursor + 30);
+0290:     const commentLen = data.readUInt16LE(cursor + 32);
+0291:     const localHeaderOffset = data.readUInt32LE(cursor + 42);
+0292:     const nameStart = cursor + 46;
+0293:     const nameEnd = nameStart + fileNameLen;
+0294:     const entryName = data.slice(nameStart, nameEnd).toString('utf8');
+0295:     const next = nameEnd + extraLen + commentLen;
+0296:     cursor = next;
+0297: 
+0298:     if (!shouldInclude(entryName)) continue;
+0299:     if (entryName.endsWith('/')) continue;
+0300:     if (localHeaderOffset + 30 > data.length) continue;
+0301:     if (data.readUInt32LE(localHeaderOffset) !== 0x04034b50) continue;
+0302: 
+0303:     const localNameLen = data.readUInt16LE(localHeaderOffset + 26);
+0304:     const localExtraLen = data.readUInt16LE(localHeaderOffset + 28);
+0305:     const payloadStart = localHeaderOffset + 30 + localNameLen + localExtraLen;
+0306:     const payloadEnd = payloadStart + compressedSize;
+0307:     if (payloadEnd > data.length) continue;
+0308: 
+0309:     const compressed = data.slice(payloadStart, payloadEnd);
+0310:     let decoded;
+0311:     if (compressionMethod === 0) {
+0312:       decoded = compressed;
+0313:     } else if (compressionMethod === 8) {
+0314:       decoded = zlib.inflateRawSync(compressed);
+0315:     } else {
+0316:       continue;
+0317:     }
+0318: 
+0319:     out.push({
+0320:       entry: entryName,
+0321:       text: decoded.toString('utf8')
+0322:     });
+0323:   }
+0324:   return out;
+0325: }
+0326: 
+0327: function summarizeReasoning(input) {
+0328:   const raw = String(input || '').trim();
+0329:   const lowered = raw.toLowerCase();
+0330:   const keywords = raw
+0331:     .split(/\s+/)
+0332:     .map((w) => w.replace(/[^a-zA-Z0-9_-]/g, ''))
+0333:     .filter(Boolean)
+0334:     .slice(0, 12);
+0335: 
+0336:   let intent = 'general_request';
+0337:   if (/error|syntax|stack|trace|bug|fix|crash/.test(lowered)) intent = 'debugging';
+0338:   else if (/how|what|why|explain|guide|tutorial/.test(lowered)) intent = 'information_lookup';
+0339:   else if (/build|create|make|implement|write/.test(lowered)) intent = 'implementation';
+0340: 
+0341:   let strategy = 'Use local conversation context then query Ollama for a grounded response.';
+0342:   if (intent === 'debugging') {
+0343:     strategy = 'Focus on likely fault points, propose checks, and request missing runtime details if needed.';
+0344:   }
+0345: 
+0346:   return {
+0347:     query: raw,
+0348:     intent,
+0349:     keywords,
+0350:     strategy,
+0351:     note: 'Detailed private chain-of-thought is not exposed; this is a concise decision summary.'
+0352:   };
+0353: }
+0354: 
+0355: class SessionLogger {
+0356:   constructor(rootDir) {
+0357:     ensureDir(rootDir);
+0358:     ensureDir(CHANGE_LOG_ROOT);
+0359:     this.rootDir = rootDir;
+0360:     this.sessionId = this.buildSessionId();
+0361:     this.sessionDir = path.join(this.rootDir, this.sessionId);
+0362:     ensureDir(this.sessionDir);
+0363: 
+0364:     this.eventsPath = path.join(this.sessionDir, 'events.jsonl');
+0365:     this.transcriptPath = path.join(this.sessionDir, 'transcript.md');
+0366:     this.statePath = path.join(this.sessionDir, 'state.jsonl');
+0367:     this.structuredPath = path.join(this.sessionDir, 'structured_history.jsonl');
+0368:     this.latestPath = path.join(this.rootDir, 'LATEST_SESSION.txt');
+0369:     this.changeLogPath = path.join(CHANGE_LOG_ROOT, `${this.sessionId}_changes.log`);
+0370: 
+0371:     this.counter = 0;
+0372:     fs.writeFileSync(this.latestPath, `${this.sessionId}\n`, 'utf8');
+0373:     fs.writeFileSync(
+0374:       this.transcriptPath,
+0375:       `# ETHUB CLI Session\n\n- session_id: ${this.sessionId}\n- started_at: ${nowIso()}\n- cwd: ${process.cwd()}\n- ollama_url: ${DEFAULT_OLLAMA_URL}\n- model_default: ${DEFAULT_MODEL}\n\n`,
+0376:       'utf8'
+0377:     );
+0378:     this.writeCodeSnapshot();
+0379: 
+0380:     this.writeEvent('session_start', {
+0381:       app: APP_NAME,
+0382:       started_at: nowIso(),
+0383:       session_dir: this.sessionDir,
+0384:       cwd: process.cwd(),
+0385:       node: process.version,
+0386:       platform: `${os.platform()} ${os.release()}`,
+0387:       ollama_url: DEFAULT_OLLAMA_URL,
+0388:       model_default: DEFAULT_MODEL
+0389:     });
+0390:   }
+0391: 
+0392:   buildSessionId() {
+0393:     const d = new Date();
+0394:     const stamp = [
+0395:       d.getUTCFullYear(),
+0396:       String(d.getUTCMonth() + 1).padStart(2, '0'),
+0397:       String(d.getUTCDate()).padStart(2, '0'),
+0398:       '_',
+0399:       String(d.getUTCHours()).padStart(2, '0'),
+0400:       String(d.getUTCMinutes()).padStart(2, '0'),
+0401:       String(d.getUTCSeconds()).padStart(2, '0'),
+0402:       '_',
+0403:       String(d.getUTCMilliseconds()).padStart(3, '0')
+0404:     ].join('');
+0405:     return `session_${stamp}`;
+0406:   }
+0407: 
+0408:   writeEvent(type, payload) {
+0409:     this.counter += 1;
+0410:     const event = {
+0411:       index: this.counter,
+0412:       ts: nowIso(),
+0413:       type,
+0414:       payload
+0415:     };
+0416:     fs.appendFileSync(this.eventsPath, `${safeJson(event)}\n`, 'utf8');
+0417:   }
+0418: 
+0419:   writeTranscript(role, content) {
+0420:     const text = String(content || '').trimEnd();
+0421:     const block = `\n## ${role} @ ${nowIso()}\n\n${text}\n`;
+0422:     fs.appendFileSync(this.transcriptPath, block, 'utf8');
+0423:   }
+0424: 
+0425:   writeState(state) {
+0426:     fs.appendFileSync(this.statePath, `${safeJson(state)}\n`, 'utf8');
+0427:   }
+0428: 
+0429:   writeStructuredRecord(record) {
+0430:     fs.appendFileSync(this.structuredPath, `${safeJson(record)}\n`, 'utf8');
+0431:   }
+0432: 
+0433:   writeCodeSnapshot() {
+0434:     const sourcePath = path.resolve(__filename);
+0435:     let sourceText = '';
+0436:     try {
+0437:       sourceText = fs.readFileSync(sourcePath, 'utf8');
+0438:     } catch (error) {
+0439:       sourceText = `Unable to read source file: ${error && error.message ? error.message : String(error)}`;
+0440:     }
+0441: 
+0442:     const numbered = sourceText
+0443:       .split('\n')
+0444:       .map((line, i) => `${String(i + 1).padStart(4, '0')}: ${line}`)
+0445:       .join('\n');
+0446: 
+0447:     const header =
+0448:       `# ETHUB CLI Change Log\n` +
+0449:       `session_id: ${this.sessionId}\n` +
+0450:       `created_at: ${nowIso()}\n` +
+0451:       `source_file: ${sourcePath}\n` +
+0452:       `note: New file per session, append-only event/state logs enabled.\n\n` +
+0453:       `## Source Snapshot (Line Numbered)\n`;
+0454: 
+0455:     fs.writeFileSync(this.changeLogPath, `${header}${numbered}\n`, 'utf8');
+0456:   }
+0457: }
+0458: 
+0459: class EthubCliAgent {
+0460:   constructor() {
+0461:     this.logger = new SessionLogger(LOG_ROOT);
+0462:     this.workspaceRoot = INITIAL_CWD;
+0463:     this.model = DEFAULT_MODEL;
+0464:     this.ollamaUrl = DEFAULT_OLLAMA_URL;
+0465:     this.skillsPath = SKILLS_PATH;
+0466:     this.requireApproval = false;
+0467:     this.history = [];
+0468:     this.pendingAction = null;
+0469:     this.actionMeta = {};
+0470:     this.skillCandidates = [];
+0471:     this.skills = this.loadSkills();
+0472:     this.dashboardInfo = null;
+0473:     this.thinkingTimer = null;
+0474:     this.isClosed = false;
+0475: 
+0476:     this.rl = readline.createInterface({
+0477:       input: process.stdin,
+0478:       output: process.stdout,
+0479:       prompt: style('ethub> ', ANSI.bold, ANSI.cyan)
+0480:     });
+0481:     this.refreshPrompt();
+0482: 
+0483:     this.logger.writeEvent('config', {
+0484:       require_approval: this.requireApproval,
+0485:       model: this.model,
+0486:       ollama_url: this.ollamaUrl,
+0487:       commands: [
+0488:         '/help',
+0489:         '/status',
+0490:         '/model <name>',
+0491:         '/approve changes on|off',
+0492:         '/readfile <path>',
+0493:         '/writefile <path> -- <content>',
+0494:         '/cd <path>',
+0495:         '/skills ...',
+0496:         '/yes',
+0497:         '/no',
+0498:         '/exit'
+0499:       ]
+0500:     });
+0501: 
+0502:     this.flushState();
+0503:   }
+0504: 
+0505:   flushState() {
+0506:     this.logger.writeState({
+0507:       ts: nowIso(),
+0508:       model: this.model,
+0509:       ollama_url: this.ollamaUrl,
+0510:       require_approval: this.requireApproval,
+0511:       history_count: this.history.length,
+0512:       pending_action: this.pendingAction
+0513:     });
+0514:   }
+0515: 
+0516:   loadSkills() {
+0517:     if (!fs.existsSync(this.skillsPath)) {
+0518:       return [];
+0519:     }
+0520:     try {
+0521:       const raw = fs.readFileSync(this.skillsPath, 'utf8');
+0522:       const parsed = JSON.parse(raw);
+0523:       if (!parsed || !Array.isArray(parsed.skills)) return [];
+0524:       return parsed.skills
+0525:         .filter((s) => s && typeof s === 'object' && typeof s.id === 'string' && typeof s.name === 'string')
+0526:         .map((s) => ({
+0527:           id: s.id,
+0528:           name: s.name,
+0529:           snippet: String(s.snippet || ''),
+0530:           source: String(s.source || 'manual'),
+0531:           executable: Boolean(s.executable),
+0532:           created_at: String(s.created_at || nowIso())
+0533:         }));
+0534:     } catch (error) {
+0535:       this.logger.writeEvent('skills_load_failed', { error: error.message });
+0536:       return [];
+0537:     }
+0538:   }
+0539: 
+0540:   saveSkills() {
+0541:     const payload = {
+0542:       updated_at: nowIso(),
+0543:       skills: this.skills
+0544:     };
+0545:     fs.writeFileSync(this.skillsPath, `${safeJson(payload)}\n`, 'utf8');
+0546:   }
+0547: 
+0548:   extractSnippetCandidatesFromText(text, sourceLabel, addCandidate) {
+0549:     const raw = String(text || '');
+0550:     const segments = [];
+0551:     let parsed = null;
+0552: 
+0553:     if (/^\s*[\[{]/.test(raw)) {
+0554:       try {
+0555:         parsed = JSON.parse(raw);
+0556:       } catch {
+0557:         parsed = null;
+0558:       }
+0559:     }
+0560: 
+0561:     const walk = (value, depth = 0) => {
+0562:       if (depth > 8) return;
+0563:       if (typeof value === 'string') {
+0564:         if (value.trim()) segments.push(value);
+0565:         return;
+0566:       }
+0567:       if (!value || typeof value !== 'object') return;
+0568:       if (Array.isArray(value)) {
+0569:         for (const item of value) walk(item, depth + 1);
+0570:         return;
+0571:       }
+0572:       if (value.content && Array.isArray(value.content.parts)) {
+0573:         for (const part of value.content.parts) {
+0574:           if (typeof part === 'string' && part.trim()) segments.push(part);
+0575:         }
+0576:       }
+0577:       if (typeof value.text === 'string' && value.text.trim()) {
+0578:         segments.push(value.text);
+0579:       }
+0580:       for (const key of Object.keys(value)) {
+0581:         if (key === 'content' || key === 'text') continue;
+0582:         walk(value[key], depth + 1);
+0583:       }
+0584:     };
+0585: 
+0586:     if (parsed) {
+0587:       walk(parsed);
+0588:     } else {
+0589:       segments.push(raw);
+0590:     }
+0591: 
+0592:     for (const segment of segments) {
+0593:       const fencePattern = /```(?:[^\n`]*)\n([\s\S]*?)```/g;
+0594:       let match;
+0595:       while ((match = fencePattern.exec(segment)) !== null) {
+0596:         addCandidate(match[1], sourceLabel, 'fenced_code');
+0597:       }
+0598: 
+0599:       const lines = segment.split('\n');
+0600:       for (const line of lines) {
+0601:         const trimmed = line.trim();
+0602:         if (!trimmed || trimmed.length > 220) continue;
+0603:         const shellLike = trimmed.replace(/^\$\s*/, '');
+0604:         if (/^(ls|pwd|cat|head|tail|wc|rg|grep|find|sed|cp|mv|mkdir|touch|echo|git)\b/.test(shellLike)) {
+0605:           addCandidate(shellLike, sourceLabel, 'shell_line');
+0606:         }
+0607:       }
+0608:     }
+0609:   }
+0610: 
+0611:   listArtifactZipFiles() {
+0612:     const out = [];
+0613:     if (!fs.existsSync(ARTIFACTS_ROOT)) return out;
+0614:     const stack = [ARTIFACTS_ROOT];
+0615:     while (stack.length) {
+0616:       const current = stack.pop();
+0617:       let entries = [];
+0618:       try {
+0619:         entries = fs.readdirSync(current, { withFileTypes: true });
+0620:       } catch {
+0621:         continue;
+0622:       }
+0623:       for (const entry of entries) {
+0624:         const full = path.join(current, entry.name);
+0625:         if (entry.isDirectory()) {
+0626:           stack.push(full);
+0627:         } else if (entry.isFile() && full.toLowerCase().endsWith('.zip')) {
+0628:           out.push(full);
+0629:         }
+0630:       }
+0631:     }
+0632:     return out;
+0633:   }
+0634: 
+0635:   collectSkillCandidatesFromArtifacts(limit = 10) {
+0636:     const snippets = new Map();
+0637:     let scannedSources = 0;
+0638:     const cap = Math.max(1, Math.min(MAX_SKILL_CANDIDATES, Number(limit) || 10));
+0639:     const addCandidate = (snippetText, sourceLabel, sourceKind) => {
+0640:       const normalized = normalizeSnippet(snippetText);
+0641:       if (!looksLikeUsefulSnippet(normalized)) return;
+0642:       const existing = snippets.get(normalized);
+0643:       if (existing) {
+0644:         existing.hits += 1;
+0645:         existing.sources.add(sourceLabel);
+0646:         return;
+0647:       }
+0648:       snippets.set(normalized, {
+0649:         snippet: normalized,
+0650:         hits: 1,
+0651:         source_kind: sourceKind,
+0652:         sources: new Set([sourceLabel])
+0653:       });
+0654:     };
+0655: 
+0656:     const zipFiles = this.listArtifactZipFiles();
+0657:     for (const zipPath of zipFiles) {
+0658:       try {
+0659:         const entries = extractTextEntriesFromZip(zipPath, isLikelyTextPath);
+0660:         for (const item of entries) {
+0661:           scannedSources += 1;
+0662:           this.extractSnippetCandidatesFromText(item.text, `${path.basename(zipPath)}:${item.entry}`, addCandidate);
+0663:         }
+0664:       } catch (error) {
+0665:         this.logger.writeEvent('skills_mine_warning', {
+0666:           stage: 'zip_read',
+0667:           zip: zipPath,
+0668:           error: error.message
+0669:         });
+0670:       }
+0671:     }
+0672: 
+0673:     const directArtifactFiles = [];
+0674:     if (fs.existsSync(ARTIFACTS_ROOT)) {
+0675:       const stack = [ARTIFACTS_ROOT];
+0676:       while (stack.length) {
+0677:         const current = stack.pop();
+0678:         let entries = [];
+0679:         try {
+0680:           entries = fs.readdirSync(current, { withFileTypes: true });
+0681:         } catch {
+0682:           continue;
+0683:         }
+0684:         for (const entry of entries) {
+0685:           const full = path.join(current, entry.name);
+0686:           if (entry.isDirectory()) stack.push(full);
+0687:           else if (entry.isFile() && !full.toLowerCase().endsWith('.zip') && isLikelyTextPath(full)) directArtifactFiles.push(full);
+0688:         }
+0689:       }
+0690:     }
+0691: 
+0692:     for (const filePath of directArtifactFiles) {
+0693:       let text = '';
+0694:       try {
+0695:         text = fs.readFileSync(filePath, 'utf8');
+0696:       } catch {
+0697:         continue;
+0698:       }
+0699:       scannedSources += 1;
+0700:       this.extractSnippetCandidatesFromText(text, this.workspaceRelativePath(filePath), addCandidate);
+0701:     }
+0702: 
+0703:     const ranked = Array.from(snippets.values())
+0704:       .sort((a, b) => b.hits - a.hits || b.snippet.length - a.snippet.length)
+0705:       .slice(0, cap);
+0706: 
+0707:     this.skillCandidates = ranked.map((entry, idx) => {
+0708:       const snippet = entry.snippet;
+0709:       const safety = this.validateSkillCommand(snippet);
+0710:       return {
+0711:         id: `cand_${idx + 1}`,
+0712:         snippet,
+0713:         hits: entry.hits,
+0714:         source_kind: entry.source_kind,
+0715:         sources: Array.from(entry.sources).slice(0, 6),
+0716:         executable: safety.ok,
+0717:         safety_reason: safety.ok ? '' : safety.reason
+0718:       };
+0719:     });
+0720: 
+0721:     this.logger.writeEvent('skills_mined', {
+0722:       candidates: this.skillCandidates.length,
+0723:       unique_snippets: snippets.size,
+0724:       scanned_sources: scannedSources,
+0725:       zip_files: zipFiles.length
+0726:     });
+0727: 
+0728:     return {
+0729:       candidates: this.skillCandidates.length,
+0730:       uniqueSnippets: snippets.size,
+0731:       scannedSources,
+0732:       zipFiles: zipFiles.length
+0733:     };
+0734:   }
+0735: 
+0736:   findCandidate(query) {
+0737:     const q = String(query || '').trim();
+0738:     if (!q) return null;
+0739:     return this.skillCandidates.find((c) => c.id === q) || null;
+0740:   }
+0741: 
+0742:   findSkill(query) {
+0743:     const q = String(query || '').trim().toLowerCase();
+0744:     if (!q) return null;
+0745:     return this.skills.find((s) => s.id.toLowerCase() === q || s.name.toLowerCase() === q) || null;
+0746:   }
+0747: 
+0748:   validatePathToken(token) {
+0749:     const raw = String(token || '').trim();
+0750:     if (!raw) return { ok: true };
+0751:     if (raw === '-' || raw.startsWith('-')) return { ok: true };
+0752:     if (raw.startsWith('/')) return { ok: false, reason: `Absolute paths are blocked (${raw}).` };
+0753:     if (raw.includes('..')) return { ok: false, reason: `Parent traversal is blocked (${raw}).` };
+0754:     const resolved = path.resolve(process.cwd(), raw);
+0755:     if (!isPathInsideRoot(this.workspaceRoot, resolved)) {
+0756:       return { ok: false, reason: `Path escapes workspace root (${raw}).` };
+0757:     }
+0758:     return { ok: true };
+0759:   }
+0760: 
+0761:   validateSkillCommand(snippet) {
+0762:     const commandText = normalizeSnippet(snippet);
+0763:     if (!commandText) return { ok: false, reason: 'Empty snippet.' };
+0764:     const lines = commandText.split('\n').map((l) => l.trim()).filter(Boolean);
+0765:     if (lines.length !== 1) return { ok: false, reason: 'Only single-line shell skills are executable.' };
+0766:     const line = lines[0];
+0767:     if (BLOCKED_COMMAND_PATTERN.test(line)) {
+0768:       return { ok: false, reason: 'Command contains blocked shell operators.' };
+0769:     }
+0770: 
+0771:     const parsed = tokenizeCommandLine(line);
+0772:     if (parsed.error) return { ok: false, reason: parsed.error };
+0773:     const tokens = parsed.tokens || [];
+0774:     if (!tokens.length) return { ok: false, reason: 'No command token found.' };
+0775: 
+0776:     const cmd = tokens[0];
+0777:     if (!SAFE_SKILL_COMMANDS.has(cmd)) {
+0778:       return { ok: false, reason: `Command '${cmd}' is not allowlisted.` };
+0779:     }
+0780:     if (cmd === 'git') {
+0781:       const sub = (tokens[1] || '').toLowerCase();
+0782:       if (!['status', 'diff', 'log', 'show', 'branch', 'rev-parse'].includes(sub)) {
+0783:         return { ok: false, reason: `git '${sub || '(none)'}' is blocked.` };
+0784:       }
+0785:     }
+0786: 
+0787:     for (let i = 1; i < tokens.length; i += 1) {
+0788:       const pathCheck = this.validatePathToken(tokens[i]);
+0789:       if (!pathCheck.ok) return pathCheck;
+0790:     }
+0791:     return { ok: true, command: cmd, tokens };
+0792:   }
+0793: 
+0794:   async runSkillCommand(action) {
+0795:     const payload = action && action.payload ? action.payload : {};
+0796:     const skillName = payload.skill_name || payload.skill_id || 'unknown';
+0797:     const snippet = String(payload.snippet || '');
+0798:     const validation = this.validateSkillCommand(snippet);
+0799:     if (!validation.ok) {
+0800:       this.print(`${style('Skill execution denied:', ANSI.bold, ANSI.red)} ${validation.reason}`);
+0801:       this.logger.writeEvent('skill_run_denied', {
+0802:         action_id: action.id,
+0803:         skill: skillName,
+0804:         reason: validation.reason
+0805:       });
+0806:       return;
+0807:     }
+0808: 
+0809:     const tokens = validation.tokens;
+0810:     const cmd = tokens[0];
+0811:     const args = tokens.slice(1);
+0812:     this.print(style(`[SKILL RUN] ${skillName}: ${snippet}`, ANSI.bold, ANSI.cyan));
+0813: 
+0814:     const result = await new Promise((resolve) => {
+0815:       const child = spawn(cmd, args, {
+0816:         cwd: process.cwd(),
+0817:         stdio: ['ignore', 'pipe', 'pipe'],
+0818:         shell: false
+0819:       });
+0820: 
+0821:       let stdout = '';
+0822:       let stderr = '';
+0823:       let finished = false;
+0824:       const timer = setTimeout(() => {
+0825:         if (finished) return;
+0826:         child.kill('SIGTERM');
+0827:       }, 120000);
+0828: 
+0829:       child.stdout.on('data', (chunk) => {
+0830:         if (stdout.length >= MAX_COMMAND_OUTPUT_BYTES) return;
+0831:         stdout += chunk.toString('utf8');
+0832:       });
+0833:       child.stderr.on('data', (chunk) => {
+0834:         if (stderr.length >= MAX_COMMAND_OUTPUT_BYTES) return;
+0835:         stderr += chunk.toString('utf8');
+0836:       });
+0837:       child.on('error', (error) => {
+0838:         clearTimeout(timer);
+0839:         finished = true;
+0840:         resolve({ code: -1, signal: null, stdout, stderr: `${stderr}\n${error.message}`.trim() });
+0841:       });
+0842:       child.on('close', (code, signal) => {
+0843:         clearTimeout(timer);
+0844:         finished = true;
+0845:         resolve({ code, signal, stdout, stderr });
+0846:       });
+0847:     });
+0848: 
+0849:     if (result.stdout) {
+0850:       this.print(style('[STDOUT]', ANSI.dim));
+0851:       this.print(truncateText(result.stdout, MAX_COMMAND_OUTPUT_BYTES));
+0852:     }
+0853:     if (result.stderr) {
+0854:       this.print(style('[STDERR]', ANSI.dim));
+0855:       this.print(truncateText(result.stderr, MAX_COMMAND_OUTPUT_BYTES));
+0856:     }
+0857:     this.print(style(`[SKILL EXIT] code=${result.code} signal=${result.signal || 'none'}`, ANSI.dim));
+0858:     this.logger.writeEvent('skill_run_complete', {
+0859:       action_id: action.id,
+0860:       skill: skillName,
+0861:       code: result.code,
+0862:       signal: result.signal,
+0863:       stdout_chars: result.stdout.length,
+0864:       stderr_chars: result.stderr.length
+0865:     });
+0866:   }
+0867: 
+0868:   readDashboardRuntime() {
+0869:     if (!fs.existsSync(WEB_DEBUG_RUNTIME_PATH)) return null;
+0870:     try {
+0871:       const parsed = JSON.parse(fs.readFileSync(WEB_DEBUG_RUNTIME_PATH, 'utf8'));
+0872:       if (!parsed || !parsed.port) return null;
+0873:       return parsed;
+0874:     } catch {
+0875:       return null;
+0876:     }
+0877:   }
+0878: 
+0879:   async isDashboardHealthy(port) {
+0880:     const target = `http://127.0.0.1:${port}/api/health`;
+0881:     try {
+0882:       const response = await fetch(target, { signal: AbortSignal.timeout(900) });
+0883:       return response.ok;
+0884:     } catch {
+0885:       return false;
+0886:     }
+0887:   }
+0888: 
+0889:   async ensureDashboardRunning() {
+0890:     const runtime = this.readDashboardRuntime();
+0891:     if (runtime && Number(runtime.port) > 0) {
+0892:       const healthy = await this.isDashboardHealthy(runtime.port);
+0893:       if (healthy) {
+0894:         this.dashboardInfo = runtime;
+0895:         return;
+0896:       }
+0897:     }
+0898: 
+0899:     if (!fs.existsSync(WEB_DEBUG_SERVER_PATH)) return;
+0900:     try {
+0901:       const child = spawn(process.execPath, [WEB_DEBUG_SERVER_PATH], {
+0902:         cwd: this.workspaceRoot,
+0903:         detached: true,
+0904:         stdio: 'ignore'
+0905:       });
+0906:       child.unref();
+0907:       this.logger.writeEvent('dashboard_boot', { started: true, path: WEB_DEBUG_SERVER_PATH });
+0908:     } catch (error) {
+0909:       this.logger.writeEvent('dashboard_boot', { started: false, error: error.message });
+0910:       return;
+0911:     }
+0912: 
+0913:     for (let i = 0; i < 10; i += 1) {
+0914:       await new Promise((resolve) => setTimeout(resolve, 300));
+0915:       const nextRuntime = this.readDashboardRuntime();
+0916:       if (nextRuntime && Number(nextRuntime.port) > 0) {
+0917:         this.dashboardInfo = nextRuntime;
+0918:         break;
+0919:       }
+0920:     }
+0921:   }
+0922: 
+0923:   async start() {
+0924:     await this.ensureDashboardRunning();
+0925:     if (ANSI_ENABLED && process.stdout.isTTY) {
+0926:       await this.animateHeader(1200, 20);
+0927:     } else {
+0928:       this.drawHeader(0);
+0929:     }
+0930:     this.print(style('ETHUB CLI Agent started. Ollama only, no external dependencies.', ANSI.bold, ANSI.cyan));
+0931:     this.print(style(`Session logs: ${this.logger.sessionDir}`, ANSI.dim));
+0932:     if (this.dashboardInfo && this.dashboardInfo.dashboard_url) {
+0933:       this.print(style(`Dashboard live: ${this.dashboardInfo.dashboard_url}`, ANSI.dim));
+0934:     } else {
+0935:       this.print(style('Dashboard boot requested. If needed, run: node web_debug/index_server.mjs', ANSI.dim));
+0936:     }
+0937:     this.print(style('Type /help for commands.', ANSI.yellow));
+0938:     await this.showSuggestions();
+0939:     this.safePrompt();
+0940: 
+0941:     this.rl.on('line', async (line) => {
+0942:       const input = String(line || '').trim();
+0943:       this.logger.writeEvent('stdin', { raw: line, trimmed: input });
+0944: 
+0945:       if (!input) {
+0946:         this.safePrompt();
+0947:         return;
+0948:       }
+0949: 
+0950:       try {
+0951:         if (input.startsWith('/')) {
+0952:           await this.handleCommand(input);
+0953:         } else {
+0954:           await this.handleUserPrompt(input);
+0955:         }
+0956:       } catch (error) {
+0957:         const message = error && error.message ? error.message : String(error);
+0958:         this.print(`${style('Error:', ANSI.bold, ANSI.red)} ${message}`);
+0959:         this.logger.writeEvent('runtime_error', { message, stack: error && error.stack ? error.stack : null });
+0960:       }
+0961: 
+0962:       this.flushState();
+0963:       this.safePrompt();
+0964:     });
+0965: 
+0966:     this.rl.on('close', () => {
+0967:       this.isClosed = true;
+0968:       this.logger.writeEvent('session_end', { ended_at: nowIso() });
+0969:       process.stdout.write('\nSession closed.\n');
+0970:       process.exit(0);
+0971:     });
+0972:   }
+0973: 
+0974:   print(text) {
+0975:     process.stdout.write(`${text}\n`);
+0976:     this.logger.writeEvent('stdout', { text });
+0977:   }
+0978: 
+0979:   safePrompt() {
+0980:     if (this.isClosed) return;
+0981:     try {
+0982:       this.printFooter();
+0983:       this.rl.prompt();
+0984:     } catch (error) {
+0985:       const message = error && error.message ? error.message : String(error);
+0986:       if (!/readline was closed/i.test(message)) {
+0987:         throw error;
+0988:       }
+0989:       this.isClosed = true;
+0990:     }
+0991:   }
+0992: 
+0993:   workspaceRelativePath(targetPath = process.cwd()) {
+0994:     const rel = path.relative(this.workspaceRoot, targetPath);
+0995:     if (!rel || rel === '') return '.';
+0996:     if (rel.startsWith('..')) return targetPath;
+0997:     return rel;
+0998:   }
+0999: 
+1000:   refreshPrompt() {
+1001:     const rel = this.workspaceRelativePath();
+1002:     this.rl.setPrompt(style(`ethub:${rel}> `, ANSI.bold, ANSI.cyan));
+1003:   }
+1004: 
+1005:   printFooter() {
+1006:     const cwdDisplay = this.workspaceRelativePath();
+1007:     this.print(LEFT_PAD + style(`cwd: ${cwdDisplay}`, ANSI.dim));
+1008:   }
+1009: 
+1010:   resolvePathInWorkspace(inputPath, expected = 'any') {
+1011:     const raw = String(inputPath || '').trim();
+1012:     if (!raw) return { error: 'path is required' };
+1013:     const normalized = raw === '~' ? os.homedir() : raw;
+1014:     const resolved = path.resolve(process.cwd(), normalized);
+1015:     const root = path.resolve(this.workspaceRoot);
+1016:     const inRoot = resolved === root || resolved.startsWith(`${root}${path.sep}`);
+1017:     if (!inRoot) {
+1018:       return { error: `path escapes workspace root: ${root}` };
+1019:     }
+1020: 
+1021:     if (expected === 'exists') {
+1022:       if (!fs.existsSync(resolved)) return { error: 'path does not exist' };
+1023:     }
+1024:     if (expected === 'file' || expected === 'dir') {
+1025:       if (!fs.existsSync(resolved)) return { error: 'path does not exist' };
+1026:       let st;
+1027:       try {
+1028:         st = fs.statSync(resolved);
+1029:       } catch (error) {
+1030:         return { error: `unable to stat path: ${error.message}` };
+1031:       }
+1032:       if (expected === 'file' && !st.isFile()) return { error: 'path is not a file' };
+1033:       if (expected === 'dir' && !st.isDirectory()) return { error: 'path is not a directory' };
+1034:     }
+1035: 
+1036:     return { path: resolved };
+1037:   }
+1038: 
+1039:   queueApprovalAction(action, promptText) {
+1040:     if (this.pendingAction) {
+1041:       this.print(`Pending action already exists (${this.pendingAction.id}). Resolve with /yes or /no first.`);
+1042:       return false;
+1043:     }
+1044:     this.pendingAction = action;
+1045:     this.logger.writeEvent('action_queued', { action_id: action.id, type: action.type, payload: action.payload });
+1046:     this.print(promptText);
+1047:     this.print(style(`Approve with /yes or reject with /no`, ANSI.yellow));
+1048:     return true;
+1049:   }
+1050: 
+1051:   printBanner() {
+1052:     for (const line of ETHUB_ASCII) {
+1053:       this.print(style(line, ANSI.magenta));
+1054:     }
+1055:   }
+1056: 
+1057:   drawHeader(frame) {
+1058:     const p1 = (frame / 90) % 1;
+1059:     const p3 = (p1 + 0.66) % 1;
+1060:     this.print(LEFT_PAD + rainbowDivider(HEADER_WIDTH, p1));
+1061:     ETHUB_ASCII.forEach((line, row) => {
+1062:       this.print(LEFT_PAD + rainbowAsciiLine(line, row, ETHUB_ASCII.length, frame));
+1063:     });
+1064:     this.print(
+1065:       LEFT_PAD +
+1066:       style(
+1067:         `Mode: CHAT | Model: ${this.model} | Change Approval: ${this.requireApproval ? 'ON' : 'OFF'} | cwd: ${this.workspaceRelativePath()}`,
+1068:         ANSI.dim
+1069:       )
+1070:     );
+1071:     this.print(LEFT_PAD + rainbowDivider(HEADER_WIDTH, p3));
+1072:   }
+1073: 
+1074:   renderHeaderFrame(frame) {
+1075:     const p1 = (frame / 90) % 1;
+1076:     const p3 = (p1 + 0.66) % 1;
+1077:     const lines = [];
+1078:     lines.push(LEFT_PAD + rainbowDivider(HEADER_WIDTH, p1));
+1079:     ETHUB_ASCII.forEach((line, row) => {
+1080:       lines.push(LEFT_PAD + rainbowAsciiLine(line, row, ETHUB_ASCII.length, frame));
+1081:     });
+1082:     lines.push(
+1083:       LEFT_PAD +
+1084:       style(
+1085:         `Mode: CHAT | Model: ${this.model} | Approval: ${this.requireApproval ? 'ON' : 'OFF'} | cwd: ${this.workspaceRelativePath()}`,
+1086:         ANSI.dim
+1087:       )
+1088:     );
+1089:     lines.push(LEFT_PAD + rainbowDivider(HEADER_WIDTH, p3));
+1090:     return lines;
+1091:   }
+1092: 
+1093:   async animateHeader(durationMs = 1200, fps = 20) {
+1094:     const frameDelay = Math.max(16, Math.floor(1000 / fps));
+1095:     const frames = Math.max(1, Math.floor(durationMs / frameDelay));
+1096:     for (let frame = 0; frame < frames; frame += 1) {
+1097:       const lines = this.renderHeaderFrame(frame);
+1098:       process.stdout.write('\x1b[2J\x1b[H');
+1099:       process.stdout.write(`${lines.join('\n')}\n`);
+1100:       await new Promise((resolve) => setTimeout(resolve, frameDelay));
+1101:     }
+1102:     process.stdout.write('\x1b[2J\x1b[H');
+1103:     this.drawHeader(frames);
+1104:   }
+1105: 
+1106:   async showSuggestions() {
+1107:     this.print('');
+1108:     this.print(LEFT_PAD + style('Suggestions (you can just start typing):', ANSI.dim));
+1109:     for (const s of SUGGESTIONS) {
+1110:       let buf = '';
+1111:       for (const ch of s) {
+1112:         buf += ch;
+1113:         process.stdout.write(`\r${LEFT_PAD}${style(`• ${buf}`, ANSI.dim)}`);
+1114:         await new Promise((resolve) => setTimeout(resolve, 12));
+1115:       }
+1116:       process.stdout.write('\n');
+1117:       await new Promise((resolve) => setTimeout(resolve, 80));
+1118:     }
+1119:     this.print('');
+1120:   }
+1121: 
+1122:   startThinking() {
+1123:     if (this.thinkingTimer) return;
+1124:     let i = 0;
+1125:     this.thinkingTimer = setInterval(() => {
+1126:       const dots = '.'.repeat(i % 4);
+1127:       process.stdout.write(
+1128:         `\r${LEFT_PAD}${style('Thinking', ANSI.cyan)}${dots.padEnd(3, ' ')}${style(' parsing your request', ANSI.dim)}${' '.repeat(20)}`
+1129:       );
+1130:       i += 1;
+1131:     }, 140);
+1132:   }
+1133: 
+1134:   stopThinking() {
+1135:     if (!this.thinkingTimer) return;
+1136:     clearInterval(this.thinkingTimer);
+1137:     this.thinkingTimer = null;
+1138:     process.stdout.write('\n');
+1139:   }
+1140: 
+1141:   async handleCommand(input) {
+1142:     const [cmd, ...args] = input.split(/\s+/);
+1143:     const command = cmd.toLowerCase();
+1144:     this.logger.writeEvent('subcommand', { command, args });
+1145: 
+1146:     if (command === '/help') {
+1147:       this.print('Commands: /help, /status, /model <name>, /approve changes on|off, /readfile <path>, /writefile <path> -- <content>, /cd <path>, /skills <mine|candidates|add|list|show|run>, /yes, /no, /exit');
+1148:       this.print('Skills flow: /skills mine 10 -> /skills add cand_1 my_skill -> /yes -> /skills run my_skill -> /yes');
+1149:       return;
+1150:     }
+1151: 
+1152:     if (command === '/status') {
+1153:       this.print(safeJson({
+1154:         model: this.model,
+1155:         ollama_url: this.ollamaUrl,
+1156:         require_approval_for_changes: this.requireApproval,
+1157:         skills_count: this.skills.length,
+1158:         skill_candidates_count: this.skillCandidates.length,
+1159:         dashboard_url: this.dashboardInfo && this.dashboardInfo.dashboard_url ? this.dashboardInfo.dashboard_url : null,
+1160:         history_count: this.history.length,
+1161:         pending_action: this.pendingAction ? this.pendingAction.id : null
+1162:       }));
+1163:       return;
+1164:     }
+1165: 
+1166:     if (command === '/model') {
+1167:       const nextModel = args.join(' ').trim();
+1168:       if (!nextModel) {
+1169:         this.print(`Current model: ${this.model}`);
+1170:         return;
+1171:       }
+1172:       this.model = nextModel;
+1173:       this.print(`Model updated: ${this.model}`);
+1174:       this.logger.writeEvent('config_update', { key: 'model', value: this.model });
+1175:       return;
+1176:     }
+1177: 
+1178:     if (command === '/approve') {
+1179:       const target = (args[0] || '').toLowerCase();
+1180:       const mode = (args[1] || '').toLowerCase();
+1181:       const legacyMode = target;
+1182: 
+1183:       if (target === 'changes' && (mode === 'on' || mode === 'off')) {
+1184:         this.requireApproval = mode === 'on';
+1185:         this.print(`Change approval mode: ${mode}`);
+1186:         this.logger.writeEvent('config_update', { key: 'require_approval_for_changes', value: this.requireApproval });
+1187:         return;
+1188:       }
+1189: 
+1190:       if (legacyMode === 'on' || legacyMode === 'off') {
+1191:         this.requireApproval = legacyMode === 'on';
+1192:         this.print(`Change approval mode: ${legacyMode}`);
+1193:         this.logger.writeEvent('config_update', { key: 'require_approval_for_changes', value: this.requireApproval });
+1194:         return;
+1195:       }
+1196: 
+1197:       if (!target) {
+1198:         this.print(`Change approval mode: ${this.requireApproval ? 'on' : 'off'}`);
+1199:         return;
+1200:       }
+1201: 
+1202:       this.print('Usage: /approve changes on|off');
+1203:       return;
+1204:     }
+1205: 
+1206:     if (command === '/yes') {
+1207:       if (!this.pendingAction) {
+1208:         this.print('No pending action to approve.');
+1209:         return;
+1210:       }
+1211:       const action = this.pendingAction;
+1212:       this.pendingAction = null;
+1213:       this.logger.writeEvent('approval', { action_id: action.id, approved: true });
+1214:       this.writeStructuredUpdate(action.id, {
+1215:         'Print-approved-by-user?': 'true',
+1216:         approved: true
+1217:       });
+1218:       await this.executePendingAction(action);
+1219:       return;
+1220:     }
+1221: 
+1222:     if (command === '/no') {
+1223:       if (!this.pendingAction) {
+1224:         this.print('No pending action to reject.');
+1225:         return;
+1226:       }
+1227:       const action = this.pendingAction;
+1228:       this.pendingAction = null;
+1229:       this.logger.writeEvent('approval', { action_id: action.id, approved: false });
+1230:       this.writeStructuredUpdate(action.id, {
+1231:         'Print-approved-by-user?': 'false',
+1232:         approved: false,
+1233:         summary: 'Action was rejected by user before runtime execution.',
+1234:         'Run runtime look at logs': 'skipped (approval rejected)'
+1235:       });
+1236:       this.print(`Action ${action.id} skipped.`);
+1237:       return;
+1238:     }
+1239: 
+1240:     if (command === '/exit') {
+1241:       this.rl.close();
+1242:       return;
+1243:     }
+1244: 
+1245:     if (command === '/cd') {
+1246:       const rawTarget = input.replace(/^\/cd\s*/i, '').trim();
+1247:       if (!rawTarget) {
+1248:         this.print(`Current directory: ${process.cwd()}`);
+1249:         return;
+1250:       }
+1251:       const resolved = this.resolvePathInWorkspace(rawTarget, 'dir');
+1252:       if (resolved.error) {
+1253:         this.print(`${style('cd denied:', ANSI.bold, ANSI.red)} ${resolved.error}`);
+1254:         return;
+1255:       }
+1256:       process.chdir(resolved.path);
+1257:       this.refreshPrompt();
+1258:       this.logger.writeEvent('cwd_changed', {
+1259:         cwd: process.cwd(),
+1260:         workspace_relative: this.workspaceRelativePath()
+1261:       });
+1262:       this.print(style(`Directory changed to ${this.workspaceRelativePath()}`, ANSI.cyan));
+1263:       return;
+1264:     }
+1265: 
+1266:     if (command === '/readfile') {
+1267:       const rawPath = input.replace(/^\/readfile\s*/i, '').trim();
+1268:       if (!rawPath) {
+1269:         this.print('Usage: /readfile <path>');
+1270:         return;
+1271:       }
+1272:       const resolved = this.resolvePathInWorkspace(rawPath, 'file');
+1273:       if (resolved.error) {
+1274:         this.print(`${style('readfile denied:', ANSI.bold, ANSI.red)} ${resolved.error}`);
+1275:         return;
+1276:       }
+1277:       const action = {
+1278:         id: `act_${Date.now()}`,
+1279:         type: 'read_file',
+1280:         payload: {
+1281:           path: resolved.path,
+1282:           rel: this.workspaceRelativePath(resolved.path)
+1283:         },
+1284:         created_at: nowIso()
+1285:       };
+1286:       this.queueApprovalAction(
+1287:         action,
+1288:         `${style('Read request queued:', ANSI.bold, ANSI.yellow)} ${action.payload.rel}`
+1289:       );
+1290:       return;
+1291:     }
+1292: 
+1293:     if (command === '/writefile') {
+1294:       const raw = input.replace(/^\/writefile\s*/i, '');
+1295:       const splitIndex = raw.indexOf(' -- ');
+1296:       if (splitIndex === -1) {
+1297:         this.print('Usage: /writefile <path> -- <content>');
+1298:         return;
+1299:       }
+1300:       const rawPath = raw.slice(0, splitIndex).trim();
+1301:       const content = raw.slice(splitIndex + 4);
+1302:       if (!rawPath) {
+1303:         this.print('Usage: /writefile <path> -- <content>');
+1304:         return;
+1305:       }
+1306:       const resolved = this.resolvePathInWorkspace(rawPath, 'any');
+1307:       if (resolved.error) {
+1308:         this.print(`${style('writefile denied:', ANSI.bold, ANSI.red)} ${resolved.error}`);
+1309:         return;
+1310:       }
+1311:       const action = {
+1312:         id: `act_${Date.now()}`,
+1313:         type: 'write_file',
+1314:         payload: {
+1315:           path: resolved.path,
+1316:           rel: this.workspaceRelativePath(resolved.path),
+1317:           content
+1318:         },
+1319:         created_at: nowIso()
+1320:       };
+1321:       this.queueApprovalAction(
+1322:         action,
+1323:         `${style('Write request queued:', ANSI.bold, ANSI.yellow)} ${action.payload.rel} (${content.length} chars)`
+1324:       );
+1325:       return;
+1326:     }
+1327: 
+1328:     if (command === '/skills') {
+1329:       const sub = (args[0] || '').toLowerCase();
+1330:       if (!sub || sub === 'help') {
+1331:         this.print('Usage:');
+1332:         this.print('/skills mine [count]');
+1333:         this.print('/skills candidates');
+1334:         this.print('/skills add <candidate_id> <skill_name>');
+1335:         this.print('/skills list');
+1336:         this.print('/skills show <skill_id|skill_name>');
+1337:         this.print('/skills run <skill_id|skill_name>');
+1338:         return;
+1339:       }
+1340: 
+1341:       if (sub === 'mine') {
+1342:         const count = Number(args[1] || 10);
+1343:         const result = this.collectSkillCandidatesFromArtifacts(count);
+1344:         this.print(style(`Mined ${result.candidates} candidate skill patterns from artifacts (sources scanned: ${result.scannedSources}).`, ANSI.cyan));
+1345:         for (const c of this.skillCandidates) {
+1346:           this.print(style(`[${c.id}] hits=${c.hits} executable=${c.executable ? 'yes' : 'no'}`, ANSI.bold, ANSI.yellow));
+1347:           this.print('```');
+1348:           this.print(c.snippet);
+1349:           this.print('```');
+1350:           if (!c.executable) this.print(style(`reason: ${c.safety_reason}`, ANSI.dim));
+1351:         }
+1352:         return;
+1353:       }
+1354: 
+1355:       if (sub === 'candidates') {
+1356:         if (!this.skillCandidates.length) {
+1357:           this.print('No candidates loaded. Run /skills mine first.');
+1358:           return;
+1359:         }
+1360:         for (const c of this.skillCandidates) {
+1361:           this.print(`[${c.id}] hits=${c.hits} executable=${c.executable ? 'yes' : 'no'} source_kind=${c.source_kind}`);
+1362:         }
+1363:         return;
+1364:       }
+1365: 
+1366:       if (sub === 'add') {
+1367:         const candidateId = args[1] || '';
+1368:         const skillName = args.slice(2).join(' ').trim();
+1369:         if (!candidateId || !skillName) {
+1370:           this.print('Usage: /skills add <candidate_id> <skill_name>');
+1371:           return;
+1372:         }
+1373:         const existing = this.findSkill(skillName);
+1374:         if (existing) {
+1375:           this.print(`Skill already exists: ${existing.name} (${existing.id})`);
+1376:           return;
+1377:         }
+1378:         const candidate = this.findCandidate(candidateId);
+1379:         if (!candidate) {
+1380:           this.print(`Candidate not found: ${candidateId}`);
+1381:           return;
+1382:         }
+1383:         const action = {
+1384:           id: `act_${Date.now()}`,
+1385:           type: 'add_skill',
+1386:           payload: {
+1387:             skill_name: skillName,
+1388:             source_candidate: candidate.id,
+1389:             snippet: candidate.snippet,
+1390:             executable: candidate.executable
+1391:           },
+1392:           created_at: nowIso()
+1393:         };
+1394:         this.queueApprovalAction(
+1395:           action,
+1396:           `${style('Add skill queued:', ANSI.bold, ANSI.yellow)} ${skillName} from ${candidate.id}`
+1397:         );
+1398:         return;
+1399:       }
+1400: 
+1401:       if (sub === 'list') {
+1402:         if (!this.skills.length) {
+1403:           this.print(`No approved skills yet. Skills file: ${this.skillsPath}`);
+1404:           return;
+1405:         }
+1406:         for (const skill of this.skills) {
+1407:           this.print(`[${skill.id}] ${skill.name} | executable=${skill.executable ? 'yes' : 'no'} | source=${skill.source}`);
+1408:         }
+1409:         return;
+1410:       }
+1411: 
+1412:       if (sub === 'show') {
+1413:         const query = args.slice(1).join(' ').trim();
+1414:         if (!query) {
+1415:           this.print('Usage: /skills show <skill_id|skill_name>');
+1416:           return;
+1417:         }
+1418:         const skill = this.findSkill(query);
+1419:         if (!skill) {
+1420:           this.print(`Skill not found: ${query}`);
+1421:           return;
+1422:         }
+1423:         this.print(style(`[${skill.id}] ${skill.name}`, ANSI.bold, ANSI.cyan));
+1424:         this.print('```');
+1425:         this.print(skill.snippet);
+1426:         this.print('```');
+1427:         return;
+1428:       }
+1429: 
+1430:       if (sub === 'run') {
+1431:         const query = args.slice(1).join(' ').trim();
+1432:         if (!query) {
+1433:           this.print('Usage: /skills run <skill_id|skill_name>');
+1434:           return;
+1435:         }
+1436:         const skill = this.findSkill(query);
+1437:         if (!skill) {
+1438:           this.print(`Skill not found: ${query}`);
+1439:           return;
+1440:         }
+1441:         const validation = this.validateSkillCommand(skill.snippet);
+1442:         if (!validation.ok) {
+1443:           this.print(`${style('Skill is not executable:', ANSI.bold, ANSI.red)} ${validation.reason}`);
+1444:           return;
+1445:         }
+1446:         const action = {
+1447:           id: `act_${Date.now()}`,
+1448:           type: 'run_skill',
+1449:           payload: {
+1450:             skill_id: skill.id,
+1451:             skill_name: skill.name,
+1452:             snippet: skill.snippet
+1453:           },
+1454:           created_at: nowIso()
+1455:         };
+1456:         this.queueApprovalAction(
+1457:           action,
+1458:           `${style('Skill execution queued:', ANSI.bold, ANSI.yellow)} ${skill.name}\n${skill.snippet}`
+1459:         );
+1460:         return;
+1461:       }
+1462: 
+1463:       this.print(`Unknown skills subcommand: ${sub}`);
+1464:       return;
+1465:     }
+1466: 
+1467:     this.print(`Unknown command: ${command}. Use /help.`);
+1468:   }
+1469: 
+1470:   async executePendingAction(action) {
+1471:     if (!action) return;
+1472:     if (action.type === 'ollama_chat') {
+1473:       await this.executeAction(action);
+1474:       return;
+1475:     }
+1476:     if (action.type === 'read_file') {
+1477:       this.runReadFileAction(action);
+1478:       return;
+1479:     }
+1480:     if (action.type === 'write_file') {
+1481:       this.runWriteFileAction(action);
+1482:       return;
+1483:     }
+1484:     if (action.type === 'add_skill') {
+1485:       this.runAddSkillAction(action);
+1486:       return;
+1487:     }
+1488:     if (action.type === 'run_skill') {
+1489:       await this.runSkillCommand(action);
+1490:       return;
+1491:     }
+1492:     this.print(`Unsupported pending action type: ${action.type}`);
+1493:   }
+1494: 
+1495:   runReadFileAction(action) {
+1496:     const filePath = action && action.payload ? action.payload.path : '';
+1497:     if (!filePath || !fs.existsSync(filePath)) {
+1498:       this.print(`${style('Read failed:', ANSI.bold, ANSI.red)} file no longer exists.`);
+1499:       return;
+1500:     }
+1501:     let text;
+1502:     try {
+1503:       text = fs.readFileSync(filePath, 'utf8');
+1504:     } catch (error) {
+1505:       this.print(`${style('Read failed:', ANSI.bold, ANSI.red)} ${error.message}`);
+1506:       return;
+1507:     }
+1508:     const shown = truncateText(text, MAX_READFILE_BYTES);
+1509:     const rel = action.payload.rel || this.workspaceRelativePath(filePath);
+1510:     this.print(style(`\n[READFILE] ${rel}`, ANSI.bold, ANSI.cyan));
+1511:     this.print(style(`bytes: ${Buffer.byteLength(text, 'utf8')} | shown: ${Buffer.byteLength(shown, 'utf8')}`, ANSI.dim));
+1512:     this.print(shown);
+1513:     this.logger.writeEvent('read_file', {
+1514:       action_id: action.id,
+1515:       file: filePath,
+1516:       bytes: Buffer.byteLength(text, 'utf8'),
+1517:       shown_bytes: Buffer.byteLength(shown, 'utf8')
+1518:     });
+1519:   }
+1520: 
+1521:   runWriteFileAction(action) {
+1522:     const filePath = action && action.payload ? action.payload.path : '';
+1523:     const content = action && action.payload ? String(action.payload.content || '') : '';
+1524:     if (!filePath) {
+1525:       this.print(`${style('Write failed:', ANSI.bold, ANSI.red)} missing target path.`);
+1526:       return;
+1527:     }
+1528:     try {
+1529:       ensureDir(path.dirname(filePath));
+1530:       fs.writeFileSync(filePath, content, 'utf8');
+1531:     } catch (error) {
+1532:       this.print(`${style('Write failed:', ANSI.bold, ANSI.red)} ${error.message}`);
+1533:       return;
+1534:     }
+1535:     this.print(style(`[WRITEFILE] wrote ${content.length} chars to ${action.payload.rel}`, ANSI.bold, ANSI.cyan));
+1536:     this.logger.writeEvent('write_file', {
+1537:       action_id: action.id,
+1538:       file: filePath,
+1539:       chars: content.length
+1540:     });
+1541:   }
+1542: 
+1543:   runAddSkillAction(action) {
+1544:     const payload = action && action.payload ? action.payload : {};
+1545:     const name = String(payload.skill_name || '').trim();
+1546:     const snippet = String(payload.snippet || '');
+1547:     if (!name || !snippet) {
+1548:       this.print(`${style('Add skill failed:', ANSI.bold, ANSI.red)} missing skill name or snippet.`);
+1549:       return;
+1550:     }
+1551:     const duplicate = this.findSkill(name);
+1552:     if (duplicate) {
+1553:       this.print(`${style('Add skill skipped:', ANSI.bold, ANSI.red)} skill already exists (${duplicate.id}).`);
+1554:       return;
+1555:     }
+1556: 
+1557:     const skill = {
+1558:       id: `skill_${Date.now()}`,
+1559:       name,
+1560:       snippet,
+1561:       source: `candidate:${payload.source_candidate || 'unknown'}`,
+1562:       executable: Boolean(payload.executable),
+1563:       created_at: nowIso()
+1564:     };
+1565:     this.skills.push(skill);
+1566:     this.saveSkills();
+1567:     this.print(style(`[SKILL ADDED] ${skill.name} (${skill.id}) executable=${skill.executable ? 'yes' : 'no'}`, ANSI.bold, ANSI.cyan));
+1568:     this.logger.writeEvent('skill_added', {
+1569:       action_id: action.id,
+1570:       skill_id: skill.id,
+1571:       skill_name: skill.name,
+1572:       executable: skill.executable
+1573:     });
+1574:   }
+1575: 
+1576:   async handleUserPrompt(input) {
+1577:     const reasoning = summarizeReasoning(input);
+1578:     const action = {
+1579:       id: `act_${Date.now()}`,
+1580:       type: 'ollama_chat',
+1581:       prompt: input,
+1582:       reasoning_summary: reasoning,
+1583:       created_at: nowIso()
+1584:     };
+1585: 
+1586:     this.logger.writeTranscript('User', input);
+1587:     this.logger.writeEvent('user_prompt', {
+1588:       text: input,
+1589:       reasoning_summary: reasoning,
+1590:       proposed_action: { id: action.id, type: action.type }
+1591:     });
+1592:     this.actionMeta[action.id] = {
+1593:       prompt: input,
+1594:       prompt_chars_before: input.length
+1595:     };
+1596: 
+1597:     this.logger.writeStructuredRecord({
+1598:       timestamp: nowIso(),
+1599:       query: input,
+1600:       reasoning: {
+1601:         query: reasoning.query,
+1602:         intent: reasoning.intent,
+1603:         keywords: reasoning.keywords,
+1604:         search_strategy: reasoning.strategy
+1605:       },
+1606:       actions: {
+1607:         action: 'local_ollama_request',
+1608:         sources: ['ollama_localhost'],
+1609:         Context: 'Analyzing locally via Ollama only; no OpenAI/Gemini/external model APIs.'
+1610:       },
+1611:       Commands: "ls, grep, nano, cd, nano 'create-new-file-diff-snippet-number+1.sh', regen entire file with changes then save, cp -rf old/path/to/file move/to/backup/path/file, rm old/path/to/file, bash create-new-file-(diff-snippet-line:character)-(number)+1, sed -i 's/old/new' \"$file\"",
+1612:       Diff: '+,-',
+1613:       Path: 'path/to/file:line:character',
+1614:       action_id: action.id,
+1615:       'Print-approved-by-user?': 'not_required (run commands)',
+1616:       'Run runtime look at logs': 'pending',
+1617:       summary: 'pending',
+1618:       'Number of characters changed': 'pending'
+1619:     });
+1620: 
+1621:     await this.executeAction(action);
+1622:   }
+1623: 
+1624:   writeStructuredUpdate(actionId, patch) {
+1625:     this.logger.writeStructuredRecord({
+1626:       timestamp: nowIso(),
+1627:       action_id: actionId,
+1628:       update: patch
+1629:     });
+1630:   }
+1631: 
+1632:   async executeAction(action) {
+1633:     if (!action || action.type !== 'ollama_chat') {
+1634:       this.logger.writeEvent('action_error', { message: 'Unsupported action type', action });
+1635:       this.writeStructuredUpdate(action && action.id ? action.id : 'unknown', {
+1636:         'Run runtime look at logs': 'contains error still, unsupported action type',
+1637:         summary: 'Unsupported action type encountered before runtime request.',
+1638:         'Number of characters changed': 'previous character amount in file before cmd/new total character count added: 0/0'
+1639:       });
+1640:       this.print('Unsupported action.');
+1641:       return;
+1642:     }
+1643: 
+1644:     this.logger.writeEvent('action_start', {
+1645:       action_id: action.id,
+1646:       type: action.type,
+1647:       target: this.ollamaUrl,
+1648:       model: this.model,
+1649:       prompt_chars: action.prompt.length,
+1650:       reasoning_summary: action.reasoning_summary
+1651:     });
+1652: 
+1653:     this.history.push({ role: 'user', content: action.prompt });
+1654: 
+1655:     const payload = {
+1656:       model: this.model,
+1657:       messages: this.history,
+1658:       stream: false
+1659:     };
+1660: 
+1661:     let response;
+1662:     let raw;
+1663:     const started = Date.now();
+1664:     this.startThinking();
+1665: 
+1666:     try {
+1667:       response = await fetch(this.ollamaUrl, {
+1668:         method: 'POST',
+1669:         headers: { 'Content-Type': 'application/json' },
+1670:         body: JSON.stringify(payload)
+1671:       });
+1672: 
+1673:       raw = await response.text();
+1674:     } catch (error) {
+1675:       this.stopThinking();
+1676:       const message = error && error.message ? error.message : String(error);
+1677:       this.logger.writeEvent('action_failure', {
+1678:         action_id: action.id,
+1679:         duration_ms: Date.now() - started,
+1680:         error: message
+1681:       });
+1682:       this.writeStructuredUpdate(action.id, {
+1683:         'Run runtime look at logs': 'contains error still, loop and try again with different results until each individual error is clear.',
+1684:         summary: `Runtime request failed. Error: ${message}`,
+1685:         'Number of characters changed': `previous character amount in file before cmd/new total character count added: ${action.prompt.length}/0`,
+1686:         'Print-approved-by-user?': 'true'
+1687:       });
+1688:       this.print(`Ollama request failed: ${message}`);
+1689:       return;
+1690:     }
+1691:     this.stopThinking();
+1692: 
+1693:     let parsed;
+1694:     try {
+1695:       parsed = JSON.parse(raw);
+1696:     } catch {
+1697:       parsed = null;
+1698:     }
+1699: 
+1700:     const assistantText = parsed && parsed.message && parsed.message.content
+1701:       ? String(parsed.message.content)
+1702:       : raw;
+1703: 
+1704:     this.history.push({ role: 'assistant', content: assistantText });
+1705: 
+1706:     this.logger.writeEvent('action_result', {
+1707:       action_id: action.id,
+1708:       duration_ms: Date.now() - started,
+1709:       http_status: response.status,
+1710:       ok: response.ok,
+1711:       response_preview: assistantText.slice(0, 400),
+1712:       response_chars: assistantText.length
+1713:     });
+1714: 
+1715:     this.logger.writeTranscript('Assistant', assistantText);
+1716:     this.print(assistantText);
+1717: 
+1718:     const hasRuntimeError = /(syntaxerror|stack overflow|runtime error|error:)/i.test(assistantText);
+1719:     const runtimeResult = hasRuntimeError
+1720:       ? 'contains error still, retry with different checks until isolated'
+1721:       : 'No runtime error anymore = fixed';
+1722:     const beforeChars = this.actionMeta[action.id] && this.actionMeta[action.id].prompt_chars_before
+1723:       ? this.actionMeta[action.id].prompt_chars_before
+1724:       : 0;
+1725:     const afterChars = assistantText.length;
+1726:     const elapsedMs = Date.now() - started;
+1727: 
+1728:     this.writeStructuredUpdate(action.id, {
+1729:       'Run runtime look at logs': runtimeResult,
+1730:       summary: `summarized what just changed, is it fixed: ${hasRuntimeError ? 'No' : 'Yes'}. Runtime error count estimate: ${hasRuntimeError ? 1 : 0}.`,
+1731:       'Number of characters changed': `previous character amount in file before cmd/new total character count added: ${beforeChars}/${afterChars}`,
+1732:       timing_ms: elapsedMs,
+1733:       stop_condition: elapsedMs >= 300000 ? 'Unable to find results or solutions, Try again.' : 'within loop budget'
+1734:     });
+1735:   }
+1736: }
+1737: 
+1738: const agent = new EthubCliAgent();
+1739: agent.start().catch((error) => {
+1740:   process.stderr.write(`Fatal startup error: ${error && error.stack ? error.stack : String(error)}\n`);
+1741:   process.exit(1);
+1742: });
+1743: 
