@@ -200,11 +200,6 @@ function readChatEvents(sessionDir, maxCount = 500) {
 
 function resolveSessionName(source) {
   if (source !== 'ethub') return '';
-  const latestPath = path.join(SOURCES.ethub, 'LATEST_SESSION.txt');
-  if (fs.existsSync(latestPath)) {
-    const fromLatest = fs.readFileSync(latestPath, 'utf8').trim();
-    if (fromLatest) return fromLatest;
-  }
   const entries = safeList(SOURCES.ethub).filter((name) => name.startsWith('session_'));
   return entries[0] || '';
 }

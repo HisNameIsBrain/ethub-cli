@@ -5,6 +5,7 @@ const path = require('path');
 const os = require('os');
 const readline = require('readline');
 const zlib = require('zlib');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const APP_NAME = 'ethub-cli-agent';
@@ -106,6 +107,8 @@ const ANSI = {
   yellow: '\x1b[33m',
   red: '\x1b[31m'
 };
+const DEBUG_PANEL_WIDTH = 90;
+const DEBUG_HORIZONTAL = '─';
 
 function style(text, ...codes) {
   if (!ANSI_ENABLED || !codes.length) return String(text);
@@ -169,172 +172,20 @@ function nowIso() {
 }
 
 function ensureDir(dirPath) {
-  fs.mkdirSync(dirPath, { recursive: true });
+  fs.mkdirSync(dirPath, { recursive: false });
 }
 
 function truncateText(input, maxLen) {
-  const text = String(input || '');
+  const text = String(input || '200');
   if (text.length <= maxLen) return text;
-  return `${text.slice(0, maxLen)}\n...[truncated]`;
+  return `${text.slice(input, maxLen)}\n...[head]`;
 }
 
-function safeJson(value) {
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return JSON.stringify({ unserializable: true, type: typeof value });
-  }
-}
 
-function isLikelyTextPath(filePath) {
-  const ext = path.extname(filePath).toLowerCase();
-  if (TEXT_EXTENSIONS.has(ext)) return true;
-  const base = path.basename(filePath).toLowerCase();
-  if (base.startsWith('conversations-') && base.endsWith('.json')) return true;
-  if (base === 'chat.html' || base === 'export_manifest.json') return true;
-  return false;
-}
-
-function normalizeSnippet(value) {
-  return String(value || '').replace(/\r\n/g, '\n').trim();
-}
-
-function looksLikeUsefulSnippet(snippet) {
-  const s = normalizeSnippet(snippet);
-  if (!s || s.length < 8) return false;
-  const lowered = s.toLowerCase();
-  if (lowered.includes('user profile is shown') || lowered.includes('before answering, quietly think')) return false;
-  if (s.length > MAX_SKILL_SNIPPET_CHARS) return false;
-  if (/^(ls|pwd|cat|head|tail|wc|rg|grep|find|sed|cp|mv|mkdir|touch|echo|git)\b/.test(s)) return true;
-  if (/[{};$]|=>|function\s|\bconst\s|\blet\s|\bclass\s|\bimport\s|\bexport\s|#!/.test(s)) return true;
-  if (/<[a-zA-Z][^>]*>[\s\S]*<\/[a-zA-Z]+>/.test(s)) return true;
-  return false;
-}
-
-function tokenizeCommandLine(input) {
-  const text = String(input || '');
-  const tokens = [];
-  let current = '';
-  let quote = null;
-  let escaping = false;
-
-  for (let i = 0; i < text.length; i += 1) {
-    const ch = text[i];
-    if (escaping) {
-      current += ch;
-      escaping = false;
-      continue;
-    }
-    if (ch === '\\') {
-      escaping = true;
-      continue;
-    }
-    if (quote) {
-      if (ch === quote) {
-        quote = null;
-      } else {
-        current += ch;
-      }
-      continue;
-    }
-    if (ch === '"' || ch === '\'') {
-      quote = ch;
-      continue;
-    }
-    if (/\s/.test(ch)) {
-      if (current) {
-        tokens.push(current);
-        current = '';
-      }
-      continue;
-    }
-    current += ch;
-  }
-
-  if (escaping) return { error: 'Command cannot end with a trailing escape.' };
-  if (quote) return { error: 'Unclosed quote in command.' };
-  if (current) tokens.push(current);
-  return { tokens };
-}
-
-function isPathInsideRoot(workspaceRoot, candidatePath) {
-  const root = path.resolve(workspaceRoot);
-  const resolved = path.resolve(candidatePath);
-  return resolved === root || resolved.startsWith(`${root}${path.sep}`);
-}
-
-function extractTextEntriesFromZip(zipPath, shouldInclude) {
-  const out = [];
-  const data = fs.readFileSync(zipPath);
-  const minEocd = 22;
-  const maxComment = 0xffff;
-  const startSearch = Math.max(0, data.length - (minEocd + maxComment));
-  let eocd = -1;
-  for (let i = data.length - minEocd; i >= startSearch; i -= 1) {
-    if (data.readUInt32LE(i) === 0x06054b50) {
-      eocd = i;
-      break;
-    }
-  }
-  if (eocd < 0) throw new Error('zip EOCD signature not found');
-
-  const centralDirSize = data.readUInt32LE(eocd + 12);
-  const centralDirOffset = data.readUInt32LE(eocd + 16);
-  const centralDirEnd = centralDirOffset + centralDirSize;
-  let cursor = centralDirOffset;
-
-  while (cursor + 46 <= centralDirEnd && cursor + 46 <= data.length) {
-    const sig = data.readUInt32LE(cursor);
-    if (sig !== 0x02014b50) break;
-    const compressionMethod = data.readUInt16LE(cursor + 10);
-    const compressedSize = data.readUInt32LE(cursor + 20);
-    const fileNameLen = data.readUInt16LE(cursor + 28);
-    const extraLen = data.readUInt16LE(cursor + 30);
-    const commentLen = data.readUInt16LE(cursor + 32);
-    const localHeaderOffset = data.readUInt32LE(cursor + 42);
-    const nameStart = cursor + 46;
-    const nameEnd = nameStart + fileNameLen;
-    const entryName = data.slice(nameStart, nameEnd).toString('utf8');
-    const next = nameEnd + extraLen + commentLen;
-    cursor = next;
-
-    if (!shouldInclude(entryName)) continue;
-    if (entryName.endsWith('/')) continue;
-    if (localHeaderOffset + 30 > data.length) continue;
-    if (data.readUInt32LE(localHeaderOffset) !== 0x04034b50) continue;
-
-    const localNameLen = data.readUInt16LE(localHeaderOffset + 26);
-    const localExtraLen = data.readUInt16LE(localHeaderOffset + 28);
-    const payloadStart = localHeaderOffset + 30 + localNameLen + localExtraLen;
-    const payloadEnd = payloadStart + compressedSize;
-    if (payloadEnd > data.length) continue;
-
-    const compressed = data.slice(payloadStart, payloadEnd);
-    let decoded;
-    if (compressionMethod === 0) {
-      decoded = compressed;
-    } else if (compressionMethod === 8) {
-      decoded = zlib.inflateRawSync(compressed);
-    } else {
-      continue;
-    }
-
-    out.push({
-      entry: entryName,
-      text: decoded.toString('utf8')
-    });
-  }
-  return out;
-}
 
 function summarizeReasoning(input) {
-  const raw = String(input || '').trim();
-  const lowered = raw.toLowerCase();
+  const raw = String(input);
   const keywords = raw
-    .split(/\s+/)
-    .map((w) => w.replace(/[^a-zA-Z0-9_-]/g, ''))
-    .filter(Boolean)
-    .slice(0, 12);
 
   let intent = 'general_request';
   if (/error|syntax|stack|trace|bug|fix|crash/.test(lowered)) intent = 'debugging';
@@ -351,7 +202,6 @@ function summarizeReasoning(input) {
     intent,
     keywords,
     strategy,
-    note: 'Detailed private chain-of-thought is not exposed; this is a concise decision summary.'
   };
 }
 
@@ -364,100 +214,6 @@ class SessionLogger {
     this.sessionDir = path.join(this.rootDir, this.sessionId);
     ensureDir(this.sessionDir);
 
-    this.eventsPath = path.join(this.sessionDir, 'events.jsonl');
-    this.transcriptPath = path.join(this.sessionDir, 'transcript.md');
-    this.statePath = path.join(this.sessionDir, 'state.jsonl');
-    this.structuredPath = path.join(this.sessionDir, 'structured_history.jsonl');
-    this.latestPath = path.join(this.rootDir, 'LATEST_SESSION.txt');
-    this.changeLogPath = path.join(CHANGE_LOG_ROOT, `${this.sessionId}_changes.log`);
-
-    this.counter = 0;
-    fs.writeFileSync(this.latestPath, `${this.sessionId}\n`, 'utf8');
-    fs.writeFileSync(
-      this.transcriptPath,
-      `# ETHUB CLI Session\n\n- session_id: ${this.sessionId}\n- started_at: ${nowIso()}\n- cwd: ${process.cwd()}\n- ollama_url: ${DEFAULT_OLLAMA_URL}\n- model_default: ${DEFAULT_MODEL}\n\n`,
-      'utf8'
-    );
-    this.writeCodeSnapshot();
-
-    this.writeEvent('session_start', {
-      app: APP_NAME,
-      started_at: nowIso(),
-      session_dir: this.sessionDir,
-      cwd: process.cwd(),
-      node: process.version,
-      platform: `${os.platform()} ${os.release()}`,
-      ollama_url: DEFAULT_OLLAMA_URL,
-      model_default: DEFAULT_MODEL
-    });
-  }
-
-  buildSessionId() {
-    const d = new Date();
-    const stamp = [
-      d.getUTCFullYear(),
-      String(d.getUTCMonth() + 1).padStart(2, '0'),
-      String(d.getUTCDate()).padStart(2, '0'),
-      '_',
-      String(d.getUTCHours()).padStart(2, '0'),
-      String(d.getUTCMinutes()).padStart(2, '0'),
-      String(d.getUTCSeconds()).padStart(2, '0'),
-      '_',
-      String(d.getUTCMilliseconds()).padStart(3, '0')
-    ].join('');
-    return `session_${stamp}`;
-  }
-
-  writeEvent(type, payload) {
-    this.counter += 1;
-    const event = {
-      index: this.counter,
-      ts: nowIso(),
-      type,
-      payload
-    };
-    fs.appendFileSync(this.eventsPath, `${safeJson(event)}\n`, 'utf8');
-  }
-
-  writeTranscript(role, content) {
-    const text = String(content || '').trimEnd();
-    const block = `\n## ${role} @ ${nowIso()}\n\n${text}\n`;
-    fs.appendFileSync(this.transcriptPath, block, 'utf8');
-  }
-
-  writeState(state) {
-    fs.appendFileSync(this.statePath, `${safeJson(state)}\n`, 'utf8');
-  }
-
-  writeStructuredRecord(record) {
-    fs.appendFileSync(this.structuredPath, `${safeJson(record)}\n`, 'utf8');
-  }
-
-  writeCodeSnapshot() {
-    const sourcePath = path.resolve(__filename);
-    let sourceText = '';
-    try {
-      sourceText = fs.readFileSync(sourcePath, 'utf8');
-    } catch (error) {
-      sourceText = `Unable to read source file: ${error && error.message ? error.message : String(error)}`;
-    }
-
-    const numbered = sourceText
-      .split('\n')
-      .map((line, i) => `${String(i + 1).padStart(4, '0')}: ${line}`)
-      .join('\n');
-
-    const header =
-      `# ETHUB CLI Change Log\n` +
-      `session_id: ${this.sessionId}\n` +
-      `created_at: ${nowIso()}\n` +
-      `source_file: ${sourcePath}\n` +
-      `note: New file per session, append-only event/state logs enabled.\n\n` +
-      `## Source Snapshot (Line Numbered)\n`;
-
-    fs.writeFileSync(this.changeLogPath, `${header}${numbered}\n`, 'utf8');
-  }
-}
 
 class EthubCliAgent {
   constructor() {
@@ -466,32 +222,33 @@ class EthubCliAgent {
     this.model = DEFAULT_MODEL;
     this.ollamaUrl = DEFAULT_OLLAMA_URL;
     this.skillsPath = SKILLS_PATH;
-    this.requireApproval = false;
+    this.requireApproval = true;
     this.history = [];
     this.pendingAction = null;
     this.actionMeta = {};
     this.skillCandidates = [];
     this.skills = this.loadSkills();
     this.dashboardInfo = null;
+    this.debugServerProcess = null;
+    this.debugServerToken = '.token';
     this.thinkingTimer = null;
     this.isClosed = false;
 
     this.rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
-      prompt: style('ethub> ', ANSI.bold, ANSI.cyan)
+      prompt: style(' | ')
     });
     this.refreshPrompt();
 
     this.logger.writeEvent('config', {
       require_approval: this.requireApproval,
-      model: this.model,
-      ollama_url: this.ollamaUrl,
       commands: [
         '/help',
         '/status',
         '/model <name>',
         '/approve changes on|off',
+        '/debug',
         '/dashboard',
         '/readfile <path>',
         '/writefile <path> -- <content>',
@@ -502,402 +259,6 @@ class EthubCliAgent {
         '/exit'
       ]
     });
-
-    this.flushState();
-  }
-
-  flushState() {
-    this.logger.writeState({
-      ts: nowIso(),
-      model: this.model,
-      ollama_url: this.ollamaUrl,
-      require_approval: this.requireApproval,
-      history_count: this.history.length,
-      pending_action: this.pendingAction
-    });
-  }
-
-  loadSkills() {
-    if (!fs.existsSync(this.skillsPath)) {
-      return [];
-    }
-    try {
-      const raw = fs.readFileSync(this.skillsPath, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (!parsed || !Array.isArray(parsed.skills)) return [];
-      return parsed.skills
-        .filter((s) => s && typeof s === 'object' && typeof s.id === 'string' && typeof s.name === 'string')
-        .map((s) => ({
-          id: s.id,
-          name: s.name,
-          snippet: String(s.snippet || ''),
-          source: String(s.source || 'manual'),
-          executable: Boolean(s.executable),
-          created_at: String(s.created_at || nowIso())
-        }));
-    } catch (error) {
-      this.logger.writeEvent('skills_load_failed', { error: error.message });
-      return [];
-    }
-  }
-
-  saveSkills() {
-    const payload = {
-      updated_at: nowIso(),
-      skills: this.skills
-    };
-    fs.writeFileSync(this.skillsPath, `${safeJson(payload)}\n`, 'utf8');
-  }
-
-  extractSnippetCandidatesFromText(text, sourceLabel, addCandidate) {
-    const raw = String(text || '');
-    const segments = [];
-    let parsed = null;
-
-    if (/^\s*[\[{]/.test(raw)) {
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        parsed = null;
-      }
-    }
-
-    const walk = (value, depth = 0) => {
-      if (depth > 8) return;
-      if (typeof value === 'string') {
-        if (value.trim()) segments.push(value);
-        return;
-      }
-      if (!value || typeof value !== 'object') return;
-      if (Array.isArray(value)) {
-        for (const item of value) walk(item, depth + 1);
-        return;
-      }
-      if (value.content && Array.isArray(value.content.parts)) {
-        for (const part of value.content.parts) {
-          if (typeof part === 'string' && part.trim()) segments.push(part);
-        }
-      }
-      if (typeof value.text === 'string' && value.text.trim()) {
-        segments.push(value.text);
-      }
-      for (const key of Object.keys(value)) {
-        if (key === 'content' || key === 'text') continue;
-        walk(value[key], depth + 1);
-      }
-    };
-
-    if (parsed) {
-      walk(parsed);
-    } else {
-      segments.push(raw);
-    }
-
-    for (const segment of segments) {
-      const fencePattern = /```(?:[^\n`]*)\n([\s\S]*?)```/g;
-      let match;
-      while ((match = fencePattern.exec(segment)) !== null) {
-        addCandidate(match[1], sourceLabel, 'fenced_code');
-      }
-
-      const lines = segment.split('\n');
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.length > 220) continue;
-        const shellLike = trimmed.replace(/^\$\s*/, '');
-        if (/^(ls|pwd|cat|head|tail|wc|rg|grep|find|sed|cp|mv|mkdir|touch|echo|git)\b/.test(shellLike)) {
-          addCandidate(shellLike, sourceLabel, 'shell_line');
-        }
-      }
-    }
-  }
-
-  listArtifactZipFiles() {
-    const out = [];
-    if (!fs.existsSync(ARTIFACTS_ROOT)) return out;
-    const stack = [ARTIFACTS_ROOT];
-    while (stack.length) {
-      const current = stack.pop();
-      let entries = [];
-      try {
-        entries = fs.readdirSync(current, { withFileTypes: true });
-      } catch {
-        continue;
-      }
-      for (const entry of entries) {
-        const full = path.join(current, entry.name);
-        if (entry.isDirectory()) {
-          stack.push(full);
-        } else if (entry.isFile() && full.toLowerCase().endsWith('.zip')) {
-          out.push(full);
-        }
-      }
-    }
-    return out;
-  }
-
-  collectSkillCandidatesFromArtifacts(limit = 10) {
-    const snippets = new Map();
-    let scannedSources = 0;
-    const cap = Math.max(1, Math.min(MAX_SKILL_CANDIDATES, Number(limit) || 10));
-    const addCandidate = (snippetText, sourceLabel, sourceKind) => {
-      const normalized = normalizeSnippet(snippetText);
-      if (!looksLikeUsefulSnippet(normalized)) return;
-      const existing = snippets.get(normalized);
-      if (existing) {
-        existing.hits += 1;
-        existing.sources.add(sourceLabel);
-        return;
-      }
-      snippets.set(normalized, {
-        snippet: normalized,
-        hits: 1,
-        source_kind: sourceKind,
-        sources: new Set([sourceLabel])
-      });
-    };
-
-    const zipFiles = this.listArtifactZipFiles();
-    for (const zipPath of zipFiles) {
-      try {
-        const entries = extractTextEntriesFromZip(zipPath, isLikelyTextPath);
-        for (const item of entries) {
-          scannedSources += 1;
-          this.extractSnippetCandidatesFromText(item.text, `${path.basename(zipPath)}:${item.entry}`, addCandidate);
-        }
-      } catch (error) {
-        this.logger.writeEvent('skills_mine_warning', {
-          stage: 'zip_read',
-          zip: zipPath,
-          error: error.message
-        });
-      }
-    }
-
-    const directArtifactFiles = [];
-    if (fs.existsSync(ARTIFACTS_ROOT)) {
-      const stack = [ARTIFACTS_ROOT];
-      while (stack.length) {
-        const current = stack.pop();
-        let entries = [];
-        try {
-          entries = fs.readdirSync(current, { withFileTypes: true });
-        } catch {
-          continue;
-        }
-        for (const entry of entries) {
-          const full = path.join(current, entry.name);
-          if (entry.isDirectory()) stack.push(full);
-          else if (entry.isFile() && !full.toLowerCase().endsWith('.zip') && isLikelyTextPath(full)) directArtifactFiles.push(full);
-        }
-      }
-    }
-
-    for (const filePath of directArtifactFiles) {
-      let text = '';
-      try {
-        text = fs.readFileSync(filePath, 'utf8');
-      } catch {
-        continue;
-      }
-      scannedSources += 1;
-      this.extractSnippetCandidatesFromText(text, this.workspaceRelativePath(filePath), addCandidate);
-    }
-
-    const ranked = Array.from(snippets.values())
-      .sort((a, b) => b.hits - a.hits || b.snippet.length - a.snippet.length)
-      .slice(0, cap);
-
-    this.skillCandidates = ranked.map((entry, idx) => {
-      const snippet = entry.snippet;
-      const safety = this.validateSkillCommand(snippet);
-      return {
-        id: `cand_${idx + 1}`,
-        snippet,
-        hits: entry.hits,
-        source_kind: entry.source_kind,
-        sources: Array.from(entry.sources).slice(0, 6),
-        executable: safety.ok,
-        safety_reason: safety.ok ? '' : safety.reason
-      };
-    });
-
-    this.logger.writeEvent('skills_mined', {
-      candidates: this.skillCandidates.length,
-      unique_snippets: snippets.size,
-      scanned_sources: scannedSources,
-      zip_files: zipFiles.length
-    });
-
-    return {
-      candidates: this.skillCandidates.length,
-      uniqueSnippets: snippets.size,
-      scannedSources,
-      zipFiles: zipFiles.length
-    };
-  }
-
-  findCandidate(query) {
-    const q = String(query || '').trim();
-    if (!q) return null;
-    return this.skillCandidates.find((c) => c.id === q) || null;
-  }
-
-  findSkill(query) {
-    const q = String(query || '').trim().toLowerCase();
-    if (!q) return null;
-    return this.skills.find((s) => s.id.toLowerCase() === q || s.name.toLowerCase() === q) || null;
-  }
-
-  validatePathToken(token) {
-    const raw = String(token || '').trim();
-    if (!raw) return { ok: true };
-    if (raw === '-' || raw.startsWith('-')) return { ok: true };
-    if (raw.startsWith('/')) return { ok: false, reason: `Absolute paths are blocked (${raw}).` };
-    if (raw.includes('..')) return { ok: false, reason: `Parent traversal is blocked (${raw}).` };
-    const resolved = path.resolve(process.cwd(), raw);
-    if (!isPathInsideRoot(this.workspaceRoot, resolved)) {
-      return { ok: false, reason: `Path escapes workspace root (${raw}).` };
-    }
-    return { ok: true };
-  }
-
-  validateSkillCommand(snippet) {
-    const commandText = normalizeSnippet(snippet);
-    if (!commandText) return { ok: false, reason: 'Empty snippet.' };
-    const lines = commandText.split('\n').map((l) => l.trim()).filter(Boolean);
-    if (lines.length !== 1) return { ok: false, reason: 'Only single-line shell skills are executable.' };
-    const line = lines[0];
-    if (BLOCKED_COMMAND_PATTERN.test(line)) {
-      return { ok: false, reason: 'Command contains blocked shell operators.' };
-    }
-
-    const parsed = tokenizeCommandLine(line);
-    if (parsed.error) return { ok: false, reason: parsed.error };
-    const tokens = parsed.tokens || [];
-    if (!tokens.length) return { ok: false, reason: 'No command token found.' };
-
-    const cmd = tokens[0];
-    if (!SAFE_SKILL_COMMANDS.has(cmd)) {
-      return { ok: false, reason: `Command '${cmd}' is not allowlisted.` };
-    }
-    if (cmd === 'git') {
-      const sub = (tokens[1] || '').toLowerCase();
-      if (!['status', 'diff', 'log', 'show', 'branch', 'rev-parse'].includes(sub)) {
-        return { ok: false, reason: `git '${sub || '(none)'}' is blocked.` };
-      }
-    }
-
-    for (let i = 1; i < tokens.length; i += 1) {
-      const pathCheck = this.validatePathToken(tokens[i]);
-      if (!pathCheck.ok) return pathCheck;
-    }
-    return { ok: true, command: cmd, tokens };
-  }
-
-  async runSkillCommand(action) {
-    const payload = action && action.payload ? action.payload : {};
-    const skillName = payload.skill_name || payload.skill_id || 'unknown';
-    const snippet = String(payload.snippet || '');
-    const validation = this.validateSkillCommand(snippet);
-    if (!validation.ok) {
-      this.print(`${style('Skill execution denied:', ANSI.bold, ANSI.red)} ${validation.reason}`);
-      this.logger.writeEvent('skill_run_denied', {
-        action_id: action.id,
-        skill: skillName,
-        reason: validation.reason
-      });
-      return;
-    }
-
-    const tokens = validation.tokens;
-    const cmd = tokens[0];
-    const args = tokens.slice(1);
-    this.print(style(`[SKILL RUN] ${skillName}: ${snippet}`, ANSI.bold, ANSI.cyan));
-
-    const result = await new Promise((resolve) => {
-      const child = spawn(cmd, args, {
-        cwd: process.cwd(),
-        stdio: ['ignore', 'pipe', 'pipe'],
-        shell: false
-      });
-
-      let stdout = '';
-      let stderr = '';
-      let finished = false;
-      const timer = setTimeout(() => {
-        if (finished) return;
-        child.kill('SIGTERM');
-      }, 120000);
-
-      child.stdout.on('data', (chunk) => {
-        if (stdout.length >= MAX_COMMAND_OUTPUT_BYTES) return;
-        stdout += chunk.toString('utf8');
-      });
-      child.stderr.on('data', (chunk) => {
-        if (stderr.length >= MAX_COMMAND_OUTPUT_BYTES) return;
-        stderr += chunk.toString('utf8');
-      });
-      child.on('error', (error) => {
-        clearTimeout(timer);
-        finished = true;
-        resolve({ code: -1, signal: null, stdout, stderr: `${stderr}\n${error.message}`.trim() });
-      });
-      child.on('close', (code, signal) => {
-        clearTimeout(timer);
-        finished = true;
-        resolve({ code, signal, stdout, stderr });
-      });
-    });
-
-    if (result.stdout) {
-      this.print(style('[STDOUT]', ANSI.dim));
-      this.print(truncateText(result.stdout, MAX_COMMAND_OUTPUT_BYTES));
-    }
-    if (result.stderr) {
-      this.print(style('[STDERR]', ANSI.dim));
-      this.print(truncateText(result.stderr, MAX_COMMAND_OUTPUT_BYTES));
-    }
-    this.print(style(`[SKILL EXIT] code=${result.code} signal=${result.signal || 'none'}`, ANSI.dim));
-    this.logger.writeEvent('skill_run_complete', {
-      action_id: action.id,
-      skill: skillName,
-      code: result.code,
-      signal: result.signal,
-      stdout_chars: result.stdout.length,
-      stderr_chars: result.stderr.length
-    });
-  }
-
-  readDashboardRuntime() {
-    const runtimePaths = [WEB_DEBUG_RUNTIME_PATH_LOCAL, WEB_DEBUG_RUNTIME_PATH_APP];
-    for (const runtimePath of runtimePaths) {
-      if (!fs.existsSync(runtimePath)) continue;
-      try {
-        const parsed = JSON.parse(fs.readFileSync(runtimePath, 'utf8'));
-        if (!parsed || !parsed.port) continue;
-        return parsed;
-      } catch {
-        // try next runtime path
-      }
-    }
-    return null;
-  }
-
-  resolveDashboardServerPath() {
-    if (fs.existsSync(WEB_DEBUG_SERVER_PATH_LOCAL)) return WEB_DEBUG_SERVER_PATH_LOCAL;
-    if (fs.existsSync(WEB_DEBUG_SERVER_PATH_APP)) return WEB_DEBUG_SERVER_PATH_APP;
-    return '';
-  }
-
-  async isDashboardHealthy(port) {
-    const target = `http://127.0.0.1:${port}/api/health`;
-    try {
-      const response = await fetch(target, { signal: AbortSignal.timeout(900) });
-      return response.ok;
-    } catch {
-      return false;
-    }
   }
 
   async ensureDashboardRunning() {
@@ -936,7 +297,6 @@ class EthubCliAgent {
   }
 
   async start() {
-    await this.ensureDashboardRunning();
     if (ANSI_ENABLED && process.stdout.isTTY) {
       await this.animateHeader(1200, 20);
     } else {
@@ -944,11 +304,7 @@ class EthubCliAgent {
     }
     this.print(style('ETHUB CLI Agent started. Ollama only, no external dependencies.', ANSI.bold, ANSI.cyan));
     this.print(style(`Session logs: ${this.logger.sessionDir}`, ANSI.dim));
-    if (this.dashboardInfo && this.dashboardInfo.dashboard_url) {
-      this.print(style(`Dashboard live: ${this.dashboardInfo.dashboard_url}`, ANSI.dim));
-    } else {
-      this.print(style('Dashboard boot requested. If needed, run: node web_debug/index_server.mjs', ANSI.dim));
-    }
+    this.print(style('Use /debug to launch a session-bound web dashboard + chat.', ANSI.dim));
     this.print(style('Type /help for commands.', ANSI.yellow));
     await this.showSuggestions();
     this.safePrompt();
@@ -973,22 +329,115 @@ class EthubCliAgent {
         this.print(`${style('Error:', ANSI.bold, ANSI.red)} ${message}`);
         this.logger.writeEvent('runtime_error', { message, stack: error && error.stack ? error.stack : null });
       }
-
-      this.flushState();
-      this.safePrompt();
     });
 
     this.rl.on('close', () => {
       this.isClosed = true;
+      this.stopDebugDashboard();
       this.logger.writeEvent('session_end', { ended_at: nowIso() });
       process.stdout.write('\nSession closed.\n');
       process.exit(0);
     });
   }
 
+
+  determineIntentWithHopper(input) {
+    const reasoning = summarizeReasoning(input);
+    const intent = String(reasoning.intent || 'general_request');
+    let lane = 'general';
+    if (intent === 'debugging') lane = 'debug';
+    else if (intent === 'implementation' || intent === 'refactor') lane = 'code';
+    else if (intent === 'shell_operation') lane = 'shell';
+    else if (intent === 'planning') lane = 'plan';
+    else if (intent === 'information_lookup' || intent === 'documentation') lane = 'research';
+    else if (intent === 'testing') lane = 'verify';
+    return { ...reasoning, hopper_lane: lane };
+  }
+
   print(text) {
     process.stdout.write(`${text}\n`);
     this.logger.writeEvent('stdout', { text });
+  }
+
+  padLineForBox(text, width) {
+    const base = String(text || '');
+    if (base.length >= width) return base.slice(0, width);
+    return base + ' '.repeat(width - base.length);
+  }
+
+  buildBox(title, rows) {
+    const width = DEBUG_PANEL_WIDTH;
+    const prefix = `┌─ ${title} `;
+    const fillerCount = Math.max(0, width - prefix.length - 1);
+    const top = `${prefix}${DEBUG_HORIZONTAL.repeat(fillerCount)}┐`;
+    const bottom = `└${DEBUG_HORIZONTAL.repeat(width - 2)}┘`;
+    const innerWidth = width - 4;
+    const body = rows.map((row) => `│ ${this.padLineForBox(row, innerWidth)} │`);
+    return [top, ...body, bottom].join('\n');
+  }
+
+  renderDebugDashboard(reasoning, context = {}) {
+    const width = DEBUG_PANEL_WIDTH;
+    const horizontal = DEBUG_HORIZONTAL.repeat(width);
+    const header = 'Agent v3.1 - Local Debug Shell';
+    const hasError = Boolean(context.error) || /error|crash|exception/i.test(reasoning.intent || '');
+    const liveLines = [
+      `INFO  cwd=${context.cwd || process.cwd()}`,
+      `INFO  target=${context.target || './src'}`,
+      `INFO  model=${this.model}`,
+      `ERROR ${context.error || (hasError ? "TypeError: Cannot read property 'foo' of undefined" : 'no faults detected')}`,
+      '',
+      `ctx.intent=${context.intent || reasoning.intent || 'unknown'}`,
+      `ctx.signal=${context.signal || (hasError ? 'runtime_exception' : 'idle')}`
+    ];
+    const debugLines = [
+      `step=${context.step || 'analyze_error'}`,
+      `input="${context.input || 'ethub fix ./src --auto-apply'}"`,
+      '',
+      'reasoning:',
+      `• classified → ${reasoning.intent || 'general_request'}`,
+      `• detected → ${context.detected || 'undefined property access'}`,
+      `• mapped → ${context.mapped || 'src/index.js:42'}`,
+      '',
+      `next=${context.next || 'generate_fix'}`
+    ];
+    const planTasks = context.plan || [
+      { label: 'scan_directory', done: true },
+      { label: 'extract_stack', done: true },
+      { label: 'map_error_to_ast', done: true },
+      { label: 'generate_patch', done: false }
+    ];
+    const planLines = planTasks.map((task) => `${task.done ? '✔' : '⏳'} ${task.label}`);
+    planLines.push('');
+    planLines.push(`ctx.strategy=${context.strategy || reasoning.strategy || 'optional_chaining'}`);
+    planLines.push(`ctx.target=${context.targetExpression || context.target || 'data.foo'}`);
+
+    const statusLine = `ollama > ${context.commandLabel || 'generating fix'} (strategy=${context.strategy || reasoning.strategy || 'optional_chaining'})`;
+    const modelStatus = `MODEL: ${this.model} | STATUS: ${context.status || (hasError ? 'generating_fix' : 'idle')} | TASK: ${context.task || 'src/index.js'}`;
+
+    const layout = [
+      header,
+      horizontal,
+      '',
+      this.buildBox('Live Dashboard', liveLines),
+      '',
+      this.buildBox('Debug Loop', debugLines),
+      '',
+      this.buildBox('TODO Plan', planLines),
+      '',
+      horizontal,
+      statusLine,
+      '',
+      horizontal,
+      modelStatus
+    ].join('\n');
+
+    process.stdout.write('\x1b[2J\x1b[H');
+    process.stdout.write(`${layout}\n`);
+  }
+
+  async showReasoningFlow(reasoning, prompt) {
+    this.renderDebugDashboard(reasoning, { input: prompt });
   }
 
   safePrompt() {
@@ -1153,17 +602,13 @@ class EthubCliAgent {
     process.stdout.write('\n');
   }
 
-  debugLoop() {
-    this.print(this.uiBox('debug loop heartbeat', 'cyan'));
-  }
-
   async handleCommand(input) {
     const [cmd, ...args] = input.split(/\s+/);
     const command = cmd.toLowerCase();
     this.logger.writeEvent('subcommand', { command, args });
 
     if (command === '/help') {
-      this.print('Commands: /help, /status, /model <name>, /approve changes on|off, /dashboard, /readfile <path>, /writefile <path> -- <content>, /cd <path>, /skills <mine|candidates|add|list|show|run>, /yes, /no, /exit');
+      this.print('Commands: /help, /status, /model <name>, /approve changes on|off, /debug, /dashboard, /readfile <path>, /writefile <path> -- <content>, /cd <path>, /skills <mine|candidates|add|list|show|run>, /yes, /no, /exit');
       this.print('Skills flow: /skills mine 10 -> /skills add cand_1 my_skill -> /yes -> /skills run my_skill -> /yes');
       return;
     }
@@ -1176,6 +621,8 @@ class EthubCliAgent {
         skills_count: this.skills.length,
         skill_candidates_count: this.skillCandidates.length,
         dashboard_url: this.dashboardInfo && this.dashboardInfo.dashboard_url ? this.dashboardInfo.dashboard_url : null,
+        chat_url: this.dashboardInfo && this.dashboardInfo.chat_url ? this.dashboardInfo.chat_url : null,
+        debug_dashboard_pid: this.debugServerProcess && !this.debugServerProcess.killed ? this.debugServerProcess.pid : null,
         history_count: this.history.length,
         pending_action: this.pendingAction ? this.pendingAction.id : null
       }));
@@ -1222,16 +669,11 @@ class EthubCliAgent {
       return;
     }
 
-    if (command === '/dashboard') {
-      await this.ensureDashboardRunning();
-      if (this.dashboardInfo && this.dashboardInfo.dashboard_url) {
-        this.print(style(`Dashboard live: ${this.dashboardInfo.dashboard_url}`, ANSI.cyan));
-        if (this.dashboardInfo.chat_url) {
-          this.print(style(`Chat live: ${this.dashboardInfo.chat_url}`, ANSI.cyan));
-        }
-      } else {
-        this.print(style('Dashboard unavailable. Try: node web_debug/index_server.mjs', ANSI.yellow));
-      }
+    if (command === '/debug' || command === '/dashboard') {
+      const info = await this.startDebugDashboard();
+      this.print(style(`Debug dashboard live: ${info.dashboard_url}`, ANSI.cyan));
+      this.print(style(`Debug chat live: ${info.chat_url}`, ANSI.cyan));
+      this.print(style(`Token length: ${this.debugServerToken.length} (never written to file)`, ANSI.dim));
       return;
     }
 
@@ -1521,11 +963,6 @@ class EthubCliAgent {
       await this.runSkillCommand(action);
       return;
     }
-    if (action.type === 'todo_plan') {
-      const payload = action && action.payload ? action.payload : {};
-      await this.executeTodoPlan(payload.plan || [], payload.file || path.resolve(__filename));
-      return;
-    }
     this.print(`Unsupported pending action type: ${action.type}`);
   }
 
@@ -1612,297 +1049,8 @@ class EthubCliAgent {
     });
   }
 
-  readFileSafe(filePath) {
-    const target = path.resolve(filePath || '');
-    if (!target) return '';
-    if (!fs.existsSync(target)) return '';
-    try {
-      return fs.readFileSync(target, 'utf8');
-    } catch (error) {
-      this.logger.writeEvent('pipeline_read_failed', {
-        file: target,
-        error: error.message
-      });
-      return '';
-    }
-  }
-
-  detectContext(code, input) {
-    const text = String(input || '');
-    return {
-      hasDebugLoop: code.includes('debugLoop'),
-      hasPipeline: code.includes('runPipeline'),
-      hasANSI: code.includes('\\x1b['),
-      isError: /error|fail|undefined|crash/i.test(text),
-      isFeature: /add|implement|feature/i.test(text),
-      isRefactor: /refactor|clean/i.test(text)
-    };
-  }
-
-  decide(ctx) {
-    if (ctx.isError) return 'debug';
-    if (!ctx.hasPipeline) return 'add_pipeline';
-    if (!ctx.hasDebugLoop) return 'add_debug';
-    if (!ctx.hasANSI) return 'add_ui';
-    if (ctx.isFeature) return 'feature';
-    return 'stable';
-  }
-
-  buildTodoPlan(decision) {
-    if (decision === 'debug') {
-      return [
-        { step: 'scan', cmd: 'ls' },
-        { step: 'analyze', cmd: 'rg -n "error|fail|undefined|crash" .' },
-        { step: 'fix', action: 'patch_debug' }
-      ];
-    }
-    if (decision === 'add_debug') {
-      return [{ step: 'patch', action: 'patch_debug_loop' }];
-    }
-    if (decision === 'add_pipeline') {
-      return [{ step: 'patch', action: 'patch_pipeline' }];
-    }
-    if (decision === 'add_ui') {
-      return [{ step: 'patch', action: 'patch_ui_marker' }];
-    }
-    return [];
-  }
-
-  uiBox(msg, color = 'cyan') {
-    const c = {
-      cyan: '\x1b[36m',
-      green: '\x1b[32m',
-      red: '\x1b[31m',
-      yellow: '\x1b[33m'
-    };
-    const code = c[color] || c.cyan;
-    return `${code}[ ${String(msg || '')} ]\x1b[0m`;
-  }
-
-  emitUiFrame(lines, clearScreen = false) {
-    const rows = Array.isArray(lines) ? lines : [];
-    if (clearScreen && process.stdout.isTTY) {
-      process.stdout.write('\x1b[2J\x1b[H');
-    }
-    const text = `${rows.join('\n')}\n`;
-    process.stdout.write(text);
-    this.logger.writeEvent('stdout', { text: rows.join('\n') });
-  }
-
-  uiRender(ctx, decision) {
-    const hasReadline = Boolean(this.rl && typeof this.rl.pause === 'function' && typeof this.rl.resume === 'function');
-    if (hasReadline) this.rl.pause();
-
-    const lines = [];
-    lines.push('\x1b[1mAgent v3.1 - Local Debug Shell\x1b[0m');
-    lines.push('');
-    lines.push('┌──────────────────────────────┐');
-    lines.push('│ Live Dashboard               │');
-    lines.push('├──────────────────────────────┤');
-    lines.push('\x1b[32mINFO\x1b[0m Starting analysis...');
-    if (ctx.isError) lines.push('\x1b[31mERROR\x1b[0m Runtime issue detected');
-    lines.push('└──────────────────────────────┘');
-    lines.push('');
-    lines.push('┌──────────────────────────────┐');
-    lines.push('│ Debug Loop                   │');
-    lines.push('├──────────────────────────────┤');
-    lines.push('1. Scan project directory');
-    lines.push('2. Analyze logs');
-    lines.push('3. Generate fix');
-    lines.push(decision === 'debug' ? '\x1b[47m\x1b[30m4. Apply changes & verify\x1b[0m' : '4. Apply changes & verify');
-    lines.push('└──────────────────────────────┘');
-    lines.push('');
-    lines.push('┌──────────────────────────────┐');
-    lines.push('│ TODO Plan                    │');
-    lines.push('├──────────────────────────────┤');
-    lines.push('✔ Scan directory');
-    lines.push('✔ Analyze logs');
-    if (decision === 'debug') {
-      lines.push('✔ Generate fix');
-      lines.push('⏳ Applying patch...');
-    }
-    lines.push('└──────────────────────────────┘');
-    lines.push('');
-    lines.push(`MODEL: ${this.model} | TASK: ${decision} | STATUS: running`);
-    this.emitUiFrame(lines, process.stdout.isTTY);
-
-    if (hasReadline) this.rl.resume();
-  }
-
-  async runPipeline(input) {
-    // Experimental path is opt-in to avoid intercepting normal prompt handling.
-    const pipelineEnabled = String(process.env.ETHUB_ENABLE_PIPELINE || '').toLowerCase() === '1'
-      || String(process.env.ETHUB_ENABLE_PIPELINE || '').toLowerCase() === 'true';
-    if (!pipelineEnabled) return false;
-
-    const file = path.resolve(__filename);
-    const code = this.readFileSafe(file);
-    const ctx = this.detectContext(code, input);
-    const decision = this.decide(ctx);
-    this.uiRender(ctx, decision);
-    this.logger.writeEvent('pipeline_decision', { decision, context: ctx, file });
-
-    if (decision === 'stable') {
-      this.print(this.uiBox('System stable. No changes needed.', 'green'));
-      return true;
-    }
-
-    const plan = this.buildTodoPlan(decision);
-    if (!plan.length) {
-      this.print(this.uiBox(`No TODO plan for decision: ${decision}`, 'yellow'));
-      return true;
-    }
-
-    if (this.requireApproval) {
-      const action = {
-        id: `todo_${Date.now()}`,
-        type: 'todo_plan',
-        payload: { plan, decision, file },
-        created_at: nowIso()
-      };
-      this.queueApprovalAction(action, this.uiBox('Awaiting approval for TODO plan (/yes or /no)', 'yellow'));
-      return true;
-    }
-
-    await this.executeTodoPlan(plan, file);
-    return true;
-  }
-
-  isSafeCommand(commandText) {
-    const text = String(commandText || '').trim();
-    if (!text) return false;
-    if (BLOCKED_COMMAND_PATTERN.test(text)) return false;
-    const parsed = tokenizeCommandLine(text);
-    if (parsed.error || !parsed.tokens || !parsed.tokens.length) return false;
-    const cmd = parsed.tokens[0];
-    return /^(ls|cd|cat|grep|rg|sed|cp|mv|tree|echo)$/.test(cmd);
-  }
-
-  async runShell(commandText) {
-    const raw = String(commandText || '').trim();
-    const parsed = tokenizeCommandLine(raw);
-    if (parsed.error) {
-      this.print(this.uiBox(`Shell parse error: ${parsed.error}`, 'red'));
-      return;
-    }
-    const tokens = parsed.tokens || [];
-    if (!tokens.length) {
-      this.print(this.uiBox('Shell command rejected (empty).', 'red'));
-      return;
-    }
-
-    const cmd = tokens[0];
-    const args = tokens.slice(1);
-
-    if (cmd === 'cd') {
-      const target = args[0] || '.';
-      const resolved = this.resolvePathInWorkspace(target, 'dir');
-      if (resolved.error) {
-        this.print(this.uiBox(`cd denied: ${resolved.error}`, 'red'));
-        return;
-      }
-      process.chdir(resolved.path);
-      this.refreshPrompt();
-      this.print(this.uiBox(`cwd -> ${this.workspaceRelativePath()}`, 'cyan'));
-      return;
-    }
-
-    await new Promise((resolve) => {
-      const proc = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], shell: false });
-      let out = '';
-      proc.stdout.on('data', (d) => {
-        out += d.toString();
-      });
-      proc.stderr.on('data', (d) => {
-        out += d.toString();
-      });
-      proc.on('error', (error) => {
-        this.print(this.uiBox(`Command failed: ${error.message}`, 'red'));
-        resolve();
-      });
-      proc.on('close', (code) => {
-        const chunk = out.trim() ? out.trim().slice(0, 300) : `(no output, exit=${code})`;
-        this.print(this.uiBox(chunk, code === 0 ? 'cyan' : 'yellow'));
-        resolve();
-      });
-    });
-  }
-
-  generatePatch(type) {
-    if (type === 'patch_debug' || type === 'patch_debug_loop') {
-      return `
-// --- PATCH: DEBUG LOOP ---
-function debugLoop() {
-  console.log("[debug] scanning...");
-}
-`;
-    }
-    if (type === 'patch_pipeline') {
-      return `
-// --- PATCH: PIPELINE ---
-function runPipeline() {
-  console.log("[pipeline] active");
-}
-`;
-    }
-    if (type === 'patch_ui_marker') {
-      return '\n// --- PATCH: ANSI UI MARKER ---\n';
-    }
-    return '';
-  }
-
-  validatePatch(original, patch) {
-    const base = String(original || '');
-    const candidate = String(patch || '');
-    if (!candidate.trim()) return false;
-    if (base.includes(candidate.trim())) return false;
-    if (base.length + candidate.length > 200000) return false;
-    return true;
-  }
-
-  applyPatchSafe(file, patch) {
-    const backup = `${file}.bak`;
-    fs.copyFileSync(file, backup);
-    try {
-      const updated = fs.readFileSync(file, 'utf8') + '\n' + patch;
-      fs.writeFileSync(file, updated, 'utf8');
-      this.print(this.uiBox('Patch applied successfully', 'green'));
-      this.logger.writeEvent('pipeline_patch_applied', { file, backup, patch_chars: patch.length });
-    } catch (error) {
-      fs.copyFileSync(backup, file);
-      this.print(this.uiBox('Patch failed -> rolled back', 'red'));
-      this.logger.writeEvent('pipeline_patch_rollback', { file, backup, error: error.message });
-    }
-  }
-
-  async executeTodoPlan(plan, file) {
-    const steps = Array.isArray(plan) ? plan : [];
-    for (const step of steps) {
-      if (step.cmd) {
-        if (!this.isSafeCommand(step.cmd)) {
-          this.print(this.uiBox(`Blocked unsafe command: ${step.cmd}`, 'red'));
-          continue;
-        }
-        await this.runShell(step.cmd);
-      }
-
-      if (step.action) {
-        const patch = this.generatePatch(step.action);
-        const original = this.readFileSafe(file);
-        if (!this.validatePatch(original, patch)) {
-          this.print(this.uiBox('Patch rejected (validation)', 'red'));
-          continue;
-        }
-        this.applyPatchSafe(file, patch);
-      }
-    }
-  }
-
   async handleUserPrompt(input) {
-    const handledByPipeline = await this.runPipeline(input);
-    if (handledByPipeline) return;
-
-    const reasoning = summarizeReasoning(input);
+    const reasoning = this.determineIntentWithHopper(input);
     const action = {
       id: `act_${Date.now()}`,
       type: 'ollama_chat',
@@ -1914,6 +1062,7 @@ function runPipeline() {
     this.logger.writeTranscript('User', input);
     this.logger.writeEvent('user_prompt', {
       text: input,
+      hopper_lane: reasoning.hopper_lane,
       reasoning_summary: reasoning,
       proposed_action: { id: action.id, type: action.type }
     });
@@ -1921,11 +1070,7 @@ function runPipeline() {
       prompt: input,
       prompt_chars_before: input.length
     };
-    const keywordsText = Array.isArray(reasoning.keywords) && reasoning.keywords.length
-      ? reasoning.keywords.join(', ')
-      : 'none';
-    this.print(style(`[Reasoning] intent=${reasoning.intent} | keywords=${keywordsText}`, ANSI.dim));
-    this.print(style(`[Reasoning] strategy=${reasoning.strategy}`, ANSI.dim));
+    await this.showReasoningFlow(reasoning, input);
 
     this.logger.writeStructuredRecord({
       timestamp: nowIso(),

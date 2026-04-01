@@ -6,15 +6,13 @@ const os = require('os');
 const readline = require('readline');
 const zlib = require('zlib');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 
 const APP_NAME = 'ethub-cli-agent';
 const APP_ROOT = path.resolve(__dirname, '..', '..');
-const DEFAULT_OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434/api/chat';
-const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:0.5b';
+const DEFAULT_OLLAMA_URL = 'http://127.0.0.1:11434/api/chat';
+const DEFAULT_MODEL = 'qwen2.5:0.5b';
 const INITIAL_CWD = process.cwd();
-const LOG_ROOT = path.join(process.cwd(), 'ethub_cli_session_logs');
-const CHANGE_LOG_ROOT = path.join(process.cwd(), 'ethub_cli_change_logs');
 const SKILLS_PATH = path.join(process.cwd(), 'ethub_cli_skills.json');
 const ARTIFACTS_ROOT = path.join(process.cwd(), 'artifacts');
 const WORKSPACE_WEB_DEBUG_DIR = path.join(INITIAL_CWD, 'web_debug');
@@ -97,7 +95,7 @@ const SUGGESTIONS = [
 const LEFT_PAD = '  ';
 const HEADER_WIDTH = 76;
 const MAX_READFILE_BYTES = 64 * 1024;
-const ANSI_ENABLED = process.stdout.isTTY && !process.env.NO_COLOR;
+const ANSI_ENABLED = true;
 const ANSI = {
   reset: '\x1b[0m',
   bold: '\x1b[1m',
@@ -109,6 +107,89 @@ const ANSI = {
 };
 const DEBUG_PANEL_WIDTH = 90;
 const DEBUG_HORIZONTAL = '─';
+const TASK_REGISTRY_WIDTH = 90;
+const FOOTER_WIDTH = 90;
+const QUEUE_PAGE_SIZE = 5;
+
+function stripAnsi(text) {
+  return String(text || '').replace(/\x1b\[[0-9;]*m/g, '');
+}
+
+function visibleLength(text) {
+  return stripAnsi(text).length;
+}
+
+function seedTaskRegistry() {
+  return [
+    { id: 'boot', label: 'boot/session', state: 'done', detail: 'logger + prompt ready' },
+    { id: 'plan', label: 'plan/idle', state: 'idle', detail: 'awaiting prompt' },
+    { id: 'worker', label: 'worker/ollama', state: 'idle', detail: 'no active request' },
+    { id: 'io', label: 'helpers/filesystem', state: 'idle', detail: 'no pending actions' }
+  ];
+}
+
+function estimateTokens(text) {
+  return Math.max(1, Math.ceil(String(text || '').length / 4));
+}
+
+function updateTaskRegistry(taskRegistry, taskId, patch) {
+  const next = Array.isArray(taskRegistry) ? taskRegistry.slice() : [];
+  const idx = next.findIndex((task) => task.id === taskId);
+  if (idx === -1) {
+    next.push({ id: taskId, label: taskId, state: 'idle', detail: '', ...(patch || {}) });
+    return next;
+  }
+  next[idx] = { ...next[idx], ...(patch || {}) };
+  return next;
+}
+
+function taskIcon(state) {
+  if (state === 'done') return style('■■', ANSI.cyan);
+  if (state === 'active') return style('▓▓', ANSI.yellow);
+  if (state === 'error') return style('██', ANSI.red);
+  if (state === 'pending') return style('▒▒', ANSI.magenta);
+  return style('··', ANSI.dim);
+}
+
+function formatTaskLine(task) {
+  const state = String(task && task.state ? task.state : 'idle');
+  const label = String(task && task.label ? task.label : 'task');
+  const detail = String(task && task.detail ? task.detail : '');
+  return `${taskIcon(state)} ${label} :: ${detail}`;
+}
+
+function formatFooterSegment(label, value, tone = ANSI.dim) {
+  return style(`${label} ${value}`, tone);
+}
+
+function formatChangeCount(additions, deletions) {
+  const parts = [];
+  if (Number.isFinite(additions) && additions > 0) parts.push(`+${additions}`);
+  if (Number.isFinite(deletions) && deletions > 0) parts.push(`-${deletions}`);
+  return parts.length ? parts.join('/') : 'delta n/a';
+}
+
+function summarizeWorktreeState(code) {
+  if (code === '??') return 'new file';
+  if (code === '!!') return 'ignored';
+  if (code.includes('D')) return 'deleted';
+  if (code.includes('R')) return 'renamed';
+  if (code.includes('A')) return 'added';
+  if (code.includes('U')) return 'conflict';
+  if (code.includes('M')) return 'modified';
+  return 'changed';
+}
+
+function trimLeadingWhitespace(text) {
+  let index = 0;
+  const source = String(text || '');
+  while (index < source.length) {
+    const ch = source[index];
+    if (ch !== ' ' && ch !== '\t') break;
+    index += 1;
+  }
+  return source.slice(index);
+}
 
 function style(text, ...codes) {
   if (!ANSI_ENABLED || !codes.length) return String(text);
@@ -358,113 +439,8 @@ function summarizeReasoning(input) {
   };
 }
 
-class SessionLogger {
-  constructor(rootDir) {
-    ensureDir(rootDir);
-    ensureDir(CHANGE_LOG_ROOT);
-    this.rootDir = rootDir;
-    this.sessionId = this.buildSessionId();
-    this.sessionDir = path.join(this.rootDir, this.sessionId);
-    ensureDir(this.sessionDir);
-
-    this.eventsPath = path.join(this.sessionDir, 'events.jsonl');
-    this.transcriptPath = path.join(this.sessionDir, 'transcript.md');
-    this.statePath = path.join(this.sessionDir, 'state.jsonl');
-    this.structuredPath = path.join(this.sessionDir, 'structured_history.jsonl');
-    this.latestPath = path.join(this.rootDir, 'LATEST_SESSION.txt');
-    this.changeLogPath = path.join(CHANGE_LOG_ROOT, `${this.sessionId}_changes.log`);
-
-    this.counter = 0;
-    fs.writeFileSync(this.latestPath, `${this.sessionId}\n`, 'utf8');
-    fs.writeFileSync(
-      this.transcriptPath,
-      `# ETHUB CLI Session\n\n- session_id: ${this.sessionId}\n- started_at: ${nowIso()}\n- cwd: ${process.cwd()}\n- ollama_url: ${DEFAULT_OLLAMA_URL}\n- model_default: ${DEFAULT_MODEL}\n\n`,
-      'utf8'
-    );
-    this.writeCodeSnapshot();
-
-    this.writeEvent('session_start', {
-      app: APP_NAME,
-      started_at: nowIso(),
-      session_dir: this.sessionDir,
-      cwd: process.cwd(),
-      node: process.version,
-      platform: `${os.platform()} ${os.release()}`,
-      ollama_url: DEFAULT_OLLAMA_URL,
-      model_default: DEFAULT_MODEL
-    });
-  }
-
-  buildSessionId() {
-    const d = new Date();
-    const stamp = [
-      d.getUTCFullYear(),
-      String(d.getUTCMonth() + 1).padStart(2, '0'),
-      String(d.getUTCDate()).padStart(2, '0'),
-      '_',
-      String(d.getUTCHours()).padStart(2, '0'),
-      String(d.getUTCMinutes()).padStart(2, '0'),
-      String(d.getUTCSeconds()).padStart(2, '0'),
-      '_',
-      String(d.getUTCMilliseconds()).padStart(3, '0')
-    ].join('');
-    return `session_${stamp}`;
-  }
-
-  writeEvent(type, payload) {
-    this.counter += 1;
-    const event = {
-      index: this.counter,
-      ts: nowIso(),
-      type,
-      payload
-    };
-    fs.appendFileSync(this.eventsPath, `${safeJson(event)}\n`, 'utf8');
-  }
-
-  writeTranscript(role, content) {
-    const text = String(content || '').trimEnd();
-    const block = `\n## ${role} @ ${nowIso()}\n\n${text}\n`;
-    fs.appendFileSync(this.transcriptPath, block, 'utf8');
-  }
-
-  writeState(state) {
-    fs.appendFileSync(this.statePath, `${safeJson(state)}\n`, 'utf8');
-  }
-
-  writeStructuredRecord(record) {
-    fs.appendFileSync(this.structuredPath, `${safeJson(record)}\n`, 'utf8');
-  }
-
-  writeCodeSnapshot() {
-    const sourcePath = path.resolve(__filename);
-    let sourceText = '';
-    try {
-      sourceText = fs.readFileSync(sourcePath, 'utf8');
-    } catch (error) {
-      sourceText = `Unable to read source file: ${error && error.message ? error.message : String(error)}`;
-    }
-
-    const numbered = sourceText
-      .split('\n')
-      .map((line, i) => `${String(i + 1).padStart(4, '0')}: ${line}`)
-      .join('\n');
-
-    const header =
-      `# ETHUB CLI Change Log\n` +
-      `session_id: ${this.sessionId}\n` +
-      `created_at: ${nowIso()}\n` +
-      `source_file: ${sourcePath}\n` +
-      `note: New file per session, append-only event/state logs enabled.\n\n` +
-      `## Source Snapshot (Line Numbered)\n`;
-
-    fs.writeFileSync(this.changeLogPath, `${header}${numbered}\n`, 'utf8');
-  }
-}
-
 class EthubCliAgent {
   constructor() {
-    this.logger = new SessionLogger(LOG_ROOT);
     this.workspaceRoot = INITIAL_CWD;
     this.model = DEFAULT_MODEL;
     this.ollamaUrl = DEFAULT_OLLAMA_URL;
@@ -472,6 +448,9 @@ class EthubCliAgent {
     this.requireApproval = false;
     this.history = [];
     this.pendingAction = null;
+    this.pendingActionPrompt = '';
+    this.pendingActions = [];
+    this.actionDrainActive = false;
     this.actionMeta = {};
     this.skillCandidates = [];
     this.skills = this.loadSkills();
@@ -480,6 +459,15 @@ class EthubCliAgent {
     this.debugServerToken = '';
     this.thinkingTimer = null;
     this.isClosed = false;
+    this.loopState = 'idle';
+    this.activeLane = 'general';
+    this.activePrompt = '';
+    this.taskRegistry = [];
+    this.promptTokensEst = 0;
+    this.completionTokensEst = 0;
+    this.totalCostEst = 0;
+    this.lastLatencyMs = 0;
+    this.actionsRun = 0;
 
     this.rl = readline.createInterface({
       input: process.stdin,
@@ -488,39 +476,11 @@ class EthubCliAgent {
     });
     this.refreshPrompt();
 
-    this.logger.writeEvent('config', {
-      require_approval: this.requireApproval,
-      model: this.model,
-      ollama_url: this.ollamaUrl,
-      commands: [
-        '/help',
-        '/status',
-        '/model <name>',
-        '/approve changes on|off',
-        '/debug',
-        '/dashboard',
-        '/readfile <path>',
-        '/writefile <path> -- <content>',
-        '/cd <path>',
-        '/skills ...',
-        '/yes',
-        '/no',
-        '/exit'
-      ]
-    });
-
-    this.flushState();
+    this.taskRegistry = seedTaskRegistry();
   }
 
-  flushState() {
-    this.logger.writeState({
-      ts: nowIso(),
-      model: this.model,
-      ollama_url: this.ollamaUrl,
-      require_approval: this.requireApproval,
-      history_count: this.history.length,
-      pending_action: this.pendingAction
-    });
+  updateTask(taskId, patch) {
+    this.taskRegistry = updateTaskRegistry(this.taskRegistry, taskId, patch);
   }
 
   loadSkills() {
@@ -542,7 +502,6 @@ class EthubCliAgent {
           created_at: String(s.created_at || nowIso())
         }));
     } catch (error) {
-      this.logger.writeEvent('skills_load_failed', { error: error.message });
       return [];
     }
   }
@@ -672,11 +631,7 @@ class EthubCliAgent {
           this.extractSnippetCandidatesFromText(item.text, `${path.basename(zipPath)}:${item.entry}`, addCandidate);
         }
       } catch (error) {
-        this.logger.writeEvent('skills_mine_warning', {
-          stage: 'zip_read',
-          zip: zipPath,
-          error: error.message
-        });
+        void error;
       }
     }
 
@@ -726,13 +681,6 @@ class EthubCliAgent {
         executable: safety.ok,
         safety_reason: safety.ok ? '' : safety.reason
       };
-    });
-
-    this.logger.writeEvent('skills_mined', {
-      candidates: this.skillCandidates.length,
-      unique_snippets: snippets.size,
-      scanned_sources: scannedSources,
-      zip_files: zipFiles.length
     });
 
     return {
@@ -808,17 +756,18 @@ class EthubCliAgent {
     const validation = this.validateSkillCommand(snippet);
     if (!validation.ok) {
       this.print(`${style('Skill execution denied:', ANSI.bold, ANSI.red)} ${validation.reason}`);
-      this.logger.writeEvent('skill_run_denied', {
-        action_id: action.id,
-        skill: skillName,
-        reason: validation.reason
-      });
       return;
     }
 
     const tokens = validation.tokens;
     const cmd = tokens[0];
     const args = tokens.slice(1);
+    this.loopState = 'running';
+    this.updateTask('io', {
+      label: 'helpers/filesystem',
+      state: 'active',
+      detail: `skill ${skillName}`
+    });
     this.print(style(`[SKILL RUN] ${skillName}: ${snippet}`, ANSI.bold, ANSI.cyan));
 
     const result = await new Promise((resolve) => {
@@ -865,13 +814,11 @@ class EthubCliAgent {
       this.print(truncateText(result.stderr, MAX_COMMAND_OUTPUT_BYTES));
     }
     this.print(style(`[SKILL EXIT] code=${result.code} signal=${result.signal || 'none'}`, ANSI.dim));
-    this.logger.writeEvent('skill_run_complete', {
-      action_id: action.id,
-      skill: skillName,
-      code: result.code,
-      signal: result.signal,
-      stdout_chars: result.stdout.length,
-      stderr_chars: result.stderr.length
+    this.loopState = result.code === 0 ? 'idle' : 'error';
+    this.updateTask('io', {
+      label: 'helpers/filesystem',
+      state: result.code === 0 ? 'done' : 'error',
+      detail: `${skillName} exit=${result.code}`
     });
   }
 
@@ -925,9 +872,7 @@ class EthubCliAgent {
         stdio: 'ignore'
       });
       child.unref();
-      this.logger.writeEvent('dashboard_boot', { started: true, path: serverPath });
     } catch (error) {
-      this.logger.writeEvent('dashboard_boot', { started: false, error: error.message });
       return;
     }
 
@@ -942,47 +887,46 @@ class EthubCliAgent {
   }
 
   async start() {
-    if (ANSI_ENABLED && process.stdout.isTTY) {
+    if (ANSI_ENABLED) {
       await this.animateHeader(1200, 20);
     } else {
       this.drawHeader(0);
     }
     this.print(style('ETHUB CLI Agent started. Ollama only, no external dependencies.', ANSI.bold, ANSI.cyan));
-    this.print(style(`Session logs: ${this.logger.sessionDir}`, ANSI.dim));
     this.print(style('Use /debug to launch a session-bound web dashboard + chat.', ANSI.dim));
     this.print(style('Type /help for commands.', ANSI.yellow));
     await this.showSuggestions();
-    this.safePrompt();
+    this.printFooter();
+    this.rl.prompt();
 
     this.rl.on('line', async (line) => {
-      const input = String(line || '').trim();
-      this.logger.writeEvent('stdin', { raw: line, trimmed: input });
+      const rawInput = String(line || '');
+      const input = rawInput.trim();
 
       if (!input) {
-        this.safePrompt();
+        this.printFooter();
+        this.rl.prompt();
         return;
       }
 
       try {
         if (input.startsWith('/')) {
-          await this.handleCommand(input);
+          await this.handleCommand(rawInput);
         } else {
           await this.handleUserPrompt(input);
         }
       } catch (error) {
         const message = error && error.message ? error.message : String(error);
         this.print(`${style('Error:', ANSI.bold, ANSI.red)} ${message}`);
-        this.logger.writeEvent('runtime_error', { message, stack: error && error.stack ? error.stack : null });
       }
 
-      this.flushState();
-      this.safePrompt();
+      this.printFooter();
+      this.rl.prompt();
     });
 
     this.rl.on('close', () => {
       this.isClosed = true;
       this.stopDebugDashboard();
-      this.logger.writeEvent('session_end', { ended_at: nowIso() });
       process.stdout.write('\nSession closed.\n');
       process.exit(0);
     });
@@ -1007,11 +951,10 @@ class EthubCliAgent {
       throw new Error('web_debug/index_server.mjs not found');
     }
 
-    const child = spawn(process.execPath, [serverPath], {
-      cwd: this.workspaceRoot,
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
+      const child = spawn(process.execPath, [serverPath], {
+        cwd: this.workspaceRoot,
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
 
     this.debugServerProcess = child;
     this.debugServerToken = '';
@@ -1020,15 +963,12 @@ class EthubCliAgent {
     child.stdout.on('data', (chunk) => {
       const text = chunk.toString();
       startupOutput += text;
-      this.logger.writeEvent('debug_dashboard_stdout', { text: text.slice(0, 800) });
     });
     child.stderr.on('data', (chunk) => {
       const text = chunk.toString();
       startupOutput += text;
-      this.logger.writeEvent('debug_dashboard_stderr', { text: text.slice(0, 800) });
     });
     child.on('exit', (code, signal) => {
-      this.logger.writeEvent('debug_dashboard_exit', { code, signal });
       this.debugServerProcess = null;
       this.dashboardInfo = null;
       this.debugServerToken = '';
@@ -1049,7 +989,6 @@ class EthubCliAgent {
           dashboard_url: `${base}/?token=${token}`,
           chat_url: `${base}/chat?token=${token}`
         };
-        this.logger.writeEvent('debug_dashboard_ready', this.dashboardInfo);
         return this.dashboardInfo;
       }
 
@@ -1063,7 +1002,6 @@ class EthubCliAgent {
             dashboard_url: `${base}/?token=${this.debugServerToken}`,
             chat_url: `${base}/chat?token=${this.debugServerToken}`
           };
-          this.logger.writeEvent('debug_dashboard_ready', this.dashboardInfo);
           return this.dashboardInfo;
         }
       }
@@ -1090,17 +1028,16 @@ class EthubCliAgent {
 
   print(text) {
     process.stdout.write(`${text}\n`);
-    this.logger.writeEvent('stdout', { text });
   }
 
   padLineForBox(text, width) {
     const base = String(text || '');
-    if (base.length >= width) return base.slice(0, width);
-    return base + ' '.repeat(width - base.length);
+    const len = visibleLength(base);
+    if (len >= width) return stripAnsi(base).slice(0, width);
+    return base + ' '.repeat(width - len);
   }
 
-  buildBox(title, rows) {
-    const width = DEBUG_PANEL_WIDTH;
+  buildBox(title, rows, width = DEBUG_PANEL_WIDTH) {
     const prefix = `┌─ ${title} `;
     const fillerCount = Math.max(0, width - prefix.length - 1);
     const top = `${prefix}${DEBUG_HORIZONTAL.repeat(fillerCount)}┐`;
@@ -1108,6 +1045,12 @@ class EthubCliAgent {
     const innerWidth = width - 4;
     const body = rows.map((row) => `│ ${this.padLineForBox(row, innerWidth)} │`);
     return [top, ...body, bottom].join('\n');
+  }
+
+  renderTaskRegistryBox() {
+    const baseRows = this.taskRegistry.map(formatTaskLine);
+    const changeRows = this.collectUncommittedChangeRows();
+    return this.buildBox('Task Registry', [...baseRows, ...changeRows], TASK_REGISTRY_WIDTH);
   }
 
   renderDebugDashboard(reasoning, context = {}) {
@@ -1174,20 +1117,6 @@ class EthubCliAgent {
     this.renderDebugDashboard(reasoning, { input: prompt });
   }
 
-  safePrompt() {
-    if (this.isClosed) return;
-    try {
-      this.printFooter();
-      this.rl.prompt();
-    } catch (error) {
-      const message = error && error.message ? error.message : String(error);
-      if (!/readline was closed/i.test(message)) {
-        throw error;
-      }
-      this.isClosed = true;
-    }
-  }
-
   workspaceRelativePath(targetPath = process.cwd()) {
     const rel = path.relative(this.workspaceRoot, targetPath);
     if (!rel || rel === '') return '.';
@@ -1200,9 +1129,120 @@ class EthubCliAgent {
     this.rl.setPrompt(style(`ethub:${rel}> `, ANSI.bold, ANSI.cyan));
   }
 
-  printFooter() {
+  runGitCommand(args) {
+    try {
+      return execFileSync('git', args, {
+        cwd: this.workspaceRoot,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore']
+      });
+    } catch {
+      return '';
+    }
+  }
+
+  collectUncommittedChangeRows() {
+    const statusOutput = this.runGitCommand(['status', '--short', '--untracked-files=all']);
+    if (!statusOutput.trim()) {
+      return [
+        formatTaskLine({
+          state: 'done',
+          label: 'queue/uncommitted',
+          detail: 'worktree clean'
+        })
+      ];
+    }
+
+    const numstatOutput = this.runGitCommand(['diff', '--numstat']);
+    const numstatMap = new Map();
+    for (const line of numstatOutput.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const parts = trimmed.split('\t');
+      if (parts.length < 3) continue;
+      const additions = Number(parts[0]);
+      const deletions = Number(parts[1]);
+      const filePath = parts.slice(2).join('\t');
+      numstatMap.set(filePath, {
+        additions: Number.isFinite(additions) ? additions : 0,
+        deletions: Number.isFinite(deletions) ? deletions : 0
+      });
+    }
+
+    const queueItems = [];
+    for (const rawLine of statusOutput.split('\n')) {
+      if (!rawLine.trim()) continue;
+      const code = rawLine.slice(0, 2);
+      const stagedCode = code[0];
+      const unstagedCode = code[1];
+      const include = code === '??' || unstagedCode !== ' ' || stagedCode === 'U' || unstagedCode === 'U';
+      if (!include) continue;
+
+      const filePath = rawLine.slice(3).trim();
+      const stat = numstatMap.get(filePath);
+      const delta = stat ? formatChangeCount(stat.additions, stat.deletions) : summarizeWorktreeState(code);
+      queueItems.push({
+        label: `queue/${String(queueItems.length + 1).padStart(2, '0')}`,
+        detail: `${filePath} :: ${delta}`,
+        state: code === '??' ? 'pending' : 'active'
+      });
+    }
+
+    const totalPages = Math.max(1, Math.ceil(queueItems.length / QUEUE_PAGE_SIZE));
+    const pageItems = queueItems.slice(0, QUEUE_PAGE_SIZE);
+    const summaryDetail = queueItems.length === 1 ? '1 unstaged item' : `${queueItems.length} unstaged items`;
+    const rows = [
+      formatTaskLine({
+        state: queueItems.length ? 'pending' : 'done',
+        label: 'queue/uncommitted',
+        detail: queueItems.length ? `${summaryDetail} | page 1/${totalPages}` : summaryDetail
+      })
+    ];
+
+    for (const item of pageItems) {
+      rows.push(formatTaskLine(item));
+    }
+
+    if (queueItems.length > pageItems.length) {
+      rows.push(formatTaskLine({
+        state: 'idle',
+        label: 'queue/more',
+        detail: `${queueItems.length - pageItems.length} more items on later pages`
+      }));
+    }
+
+    return rows;
+  }
+
+  renderStatusFooter() {
     const cwdDisplay = this.workspaceRelativePath();
-    this.print(LEFT_PAD + style(`cwd: ${cwdDisplay}`, ANSI.dim));
+    const pendingCount = this.pendingActions.length + (this.pendingAction ? 1 : 0);
+    const pendingLabel = this.pendingAction
+      ? `${this.pendingAction.type}${pendingCount > 1 ? ` +${pendingCount - 1}` : ''}`
+      : pendingCount
+        ? `${pendingCount} queued`
+        : 'none';
+    const footerTop = [
+      formatFooterSegment('MODEL', this.model, ANSI.cyan),
+      formatFooterSegment('LANE', this.activeLane, ANSI.yellow),
+      formatFooterSegment('LOOP', this.loopState, this.loopState === 'error' ? ANSI.red : ANSI.dim),
+      formatFooterSegment('PENDING', pendingLabel, this.pendingAction ? ANSI.yellow : ANSI.dim)
+    ].join(' | ');
+    const footerBottom = [
+      formatFooterSegment('PROMPT_TOK', this.promptTokensEst, ANSI.dim),
+      formatFooterSegment('COMP_TOK', this.completionTokensEst, ANSI.dim),
+      formatFooterSegment('COST_EST', `$${this.totalCostEst.toFixed(4)}`, ANSI.dim),
+      formatFooterSegment('LATENCY', `${this.lastLatencyMs}ms`, ANSI.dim),
+      formatFooterSegment('ACTIONS', this.actionsRun, ANSI.dim),
+      formatFooterSegment('CWD', cwdDisplay, ANSI.dim)
+    ].join(' | ');
+    return this.buildBox('Status Footer', [footerTop, footerBottom], FOOTER_WIDTH);
+  }
+
+  printFooter() {
+    this.print('');
+    this.print(this.renderTaskRegistryBox());
+    this.print(this.renderStatusFooter());
   }
 
   resolvePathInWorkspace(inputPath, expected = 'any') {
@@ -1235,15 +1275,76 @@ class EthubCliAgent {
   }
 
   queueApprovalAction(action, promptText) {
-    if (this.pendingAction) {
-      this.print(`Pending action already exists (${this.pendingAction.id}). Resolve with /yes or /no first.`);
-      return false;
-    }
-    this.pendingAction = action;
-    this.logger.writeEvent('action_queued', { action_id: action.id, type: action.type, payload: action.payload });
-    this.print(promptText);
-    this.print(style(`Approve with /yes or reject with /no`, ANSI.yellow));
+    this.pendingActions.push({ action, promptText });
+    this.updateTask('io', {
+      label: 'helpers/filesystem',
+      state: 'pending',
+      detail: `${this.pendingActions.length + (this.pendingAction ? 1 : 0)} queued`
+    });
     return true;
+  }
+
+  async dispatchAction(action, promptText) {
+    this.queueApprovalAction(action, promptText);
+    await this.drainPendingActions();
+  }
+
+  presentPendingApproval() {
+    if (!this.pendingAction) return;
+    this.loopState = 'awaiting-approval';
+    this.updateTask('io', {
+      label: 'helpers/filesystem',
+      state: 'pending',
+      detail: `${this.pendingAction.type} awaiting approval (${this.pendingActions.length} queued behind)`
+    });
+    const overlay = this.buildBox('Permission Required', [
+      stripAnsi(this.pendingActionPrompt || `${this.pendingAction.type} queued`),
+      `action ${this.pendingAction.id}`,
+      '[Y] /yes    [N] /no'
+    ]);
+    this.print(overlay);
+  }
+
+  async drainPendingActions() {
+    if (this.actionDrainActive) return;
+    this.actionDrainActive = true;
+    try {
+      while (true) {
+        if (!this.pendingAction) {
+          const nextEntry = this.pendingActions.shift();
+          if (!nextEntry) break;
+          this.pendingAction = nextEntry.action;
+          this.pendingActionPrompt = nextEntry.promptText || '';
+        }
+
+        if (this.requireApproval) {
+          if (this.loopState !== 'awaiting-approval') {
+            this.presentPendingApproval();
+          }
+          break;
+        }
+
+        const action = this.pendingAction;
+        this.pendingAction = null;
+        this.pendingActionPrompt = '';
+        this.loopState = 'running';
+        this.updateTask('io', {
+          label: 'helpers/filesystem',
+          state: 'active',
+          detail: `${action.type} running (${this.pendingActions.length} queued behind)`
+        });
+        await this.executePendingAction(action);
+      }
+    } finally {
+      this.actionDrainActive = false;
+      if (!this.pendingAction && !this.pendingActions.length && this.loopState !== 'error') {
+        this.updateTask('io', {
+          label: 'helpers/filesystem',
+          state: 'done',
+          detail: 'queue empty'
+        });
+      }
+    }
   }
 
   printBanner() {
@@ -1337,9 +1438,12 @@ class EthubCliAgent {
   }
 
   async handleCommand(input) {
-    const [cmd, ...args] = input.split(/\s+/);
+    const commandInput = String(input || '');
+    const normalizedInput = commandInput.trim();
+    const [cmd, ...args] = normalizedInput.split(/\s+/);
     const command = cmd.toLowerCase();
-    this.logger.writeEvent('subcommand', { command, args });
+    const commandOffset = commandInput.toLowerCase().indexOf(command);
+    const commandTail = commandOffset >= 0 ? commandInput.slice(commandOffset + command.length) : '';
 
     if (command === '/help') {
       this.print('Commands: /help, /status, /model <name>, /approve changes on|off, /debug, /dashboard, /readfile <path>, /writefile <path> -- <content>, /cd <path>, /skills <mine|candidates|add|list|show|run>, /yes, /no, /exit');
@@ -1352,13 +1456,22 @@ class EthubCliAgent {
         model: this.model,
         ollama_url: this.ollamaUrl,
         require_approval_for_changes: this.requireApproval,
+        loop_state: this.loopState,
+        active_lane: this.activeLane,
         skills_count: this.skills.length,
         skill_candidates_count: this.skillCandidates.length,
         dashboard_url: this.dashboardInfo && this.dashboardInfo.dashboard_url ? this.dashboardInfo.dashboard_url : null,
         chat_url: this.dashboardInfo && this.dashboardInfo.chat_url ? this.dashboardInfo.chat_url : null,
         debug_dashboard_pid: this.debugServerProcess && !this.debugServerProcess.killed ? this.debugServerProcess.pid : null,
         history_count: this.history.length,
-        pending_action: this.pendingAction ? this.pendingAction.id : null
+        pending_action: this.pendingAction ? this.pendingAction.id : null,
+        pending_actions_queued: this.pendingActions.length,
+        task_registry: this.taskRegistry,
+        prompt_tokens_est: this.promptTokensEst,
+        completion_tokens_est: this.completionTokensEst,
+        total_cost_est: this.totalCostEst,
+        last_latency_ms: this.lastLatencyMs,
+        actions_run: this.actionsRun
       }));
       return;
     }
@@ -1370,8 +1483,12 @@ class EthubCliAgent {
         return;
       }
       this.model = nextModel;
+      this.updateTask('worker', {
+        label: 'worker/ollama',
+        state: 'done',
+        detail: `model -> ${this.model}`
+      });
       this.print(`Model updated: ${this.model}`);
-      this.logger.writeEvent('config_update', { key: 'model', value: this.model });
       return;
     }
 
@@ -1383,14 +1500,18 @@ class EthubCliAgent {
       if (target === 'changes' && (mode === 'on' || mode === 'off')) {
         this.requireApproval = mode === 'on';
         this.print(`Change approval mode: ${mode}`);
-        this.logger.writeEvent('config_update', { key: 'require_approval_for_changes', value: this.requireApproval });
+        if (!this.requireApproval) {
+          await this.drainPendingActions();
+        }
         return;
       }
 
       if (legacyMode === 'on' || legacyMode === 'off') {
         this.requireApproval = legacyMode === 'on';
         this.print(`Change approval mode: ${legacyMode}`);
-        this.logger.writeEvent('config_update', { key: 'require_approval_for_changes', value: this.requireApproval });
+        if (!this.requireApproval) {
+          await this.drainPendingActions();
+        }
         return;
       }
 
@@ -1417,13 +1538,16 @@ class EthubCliAgent {
         return;
       }
       const action = this.pendingAction;
-      this.pendingAction = null;
-      this.logger.writeEvent('approval', { action_id: action.id, approved: true });
-      this.writeStructuredUpdate(action.id, {
-        'Print-approved-by-user?': 'true',
-        approved: true
+      this.loopState = 'approved';
+      this.updateTask('io', {
+        label: 'helpers/filesystem',
+        state: 'active',
+        detail: `${action.type} approved (${this.pendingActions.length} queued behind)`
       });
+      this.pendingAction = null;
+      this.pendingActionPrompt = '';
       await this.executePendingAction(action);
+      await this.drainPendingActions();
       return;
     }
 
@@ -1434,14 +1558,15 @@ class EthubCliAgent {
       }
       const action = this.pendingAction;
       this.pendingAction = null;
-      this.logger.writeEvent('approval', { action_id: action.id, approved: false });
-      this.writeStructuredUpdate(action.id, {
-        'Print-approved-by-user?': 'false',
-        approved: false,
-        summary: 'Action was rejected by user before runtime execution.',
-        'Run runtime look at logs': 'skipped (approval rejected)'
+      this.pendingActionPrompt = '';
+      this.loopState = 'idle';
+      this.updateTask('io', {
+        label: 'helpers/filesystem',
+        state: 'error',
+        detail: `${action.type} rejected (${this.pendingActions.length} queued behind)`
       });
       this.print(`Action ${action.id} skipped.`);
+      await this.drainPendingActions();
       return;
     }
 
@@ -1451,7 +1576,7 @@ class EthubCliAgent {
     }
 
     if (command === '/cd') {
-      const rawTarget = input.replace(/^\/cd\s*/i, '').trim();
+      const rawTarget = trimLeadingWhitespace(commandTail).trim();
       if (!rawTarget) {
         this.print(`Current directory: ${process.cwd()}`);
         return;
@@ -1463,16 +1588,17 @@ class EthubCliAgent {
       }
       process.chdir(resolved.path);
       this.refreshPrompt();
-      this.logger.writeEvent('cwd_changed', {
-        cwd: process.cwd(),
-        workspace_relative: this.workspaceRelativePath()
+      this.updateTask('io', {
+        label: 'helpers/filesystem',
+        state: 'done',
+        detail: `cwd -> ${this.workspaceRelativePath()}`
       });
       this.print(style(`Directory changed to ${this.workspaceRelativePath()}`, ANSI.cyan));
       return;
     }
 
     if (command === '/readfile') {
-      const rawPath = input.replace(/^\/readfile\s*/i, '').trim();
+      const rawPath = trimLeadingWhitespace(commandTail).trim();
       if (!rawPath) {
         this.print('Usage: /readfile <path>');
         return;
@@ -1491,7 +1617,7 @@ class EthubCliAgent {
         },
         created_at: nowIso()
       };
-      this.queueApprovalAction(
+      await this.dispatchAction(
         action,
         `${style('Read request queued:', ANSI.bold, ANSI.yellow)} ${action.payload.rel}`
       );
@@ -1499,7 +1625,7 @@ class EthubCliAgent {
     }
 
     if (command === '/writefile') {
-      const raw = input.replace(/^\/writefile\s*/i, '');
+      const raw = trimLeadingWhitespace(commandTail);
       const splitIndex = raw.indexOf(' -- ');
       if (splitIndex === -1) {
         this.print('Usage: /writefile <path> -- <content>');
@@ -1526,7 +1652,7 @@ class EthubCliAgent {
         },
         created_at: nowIso()
       };
-      this.queueApprovalAction(
+      await this.dispatchAction(
         action,
         `${style('Write request queued:', ANSI.bold, ANSI.yellow)} ${action.payload.rel} (${content.length} chars)`
       );
@@ -1599,7 +1725,7 @@ class EthubCliAgent {
           },
           created_at: nowIso()
         };
-        this.queueApprovalAction(
+        await this.dispatchAction(
           action,
           `${style('Add skill queued:', ANSI.bold, ANSI.yellow)} ${skillName} from ${candidate.id}`
         );
@@ -1661,7 +1787,7 @@ class EthubCliAgent {
           },
           created_at: nowIso()
         };
-        this.queueApprovalAction(
+        await this.dispatchAction(
           action,
           `${style('Skill execution queued:', ANSI.bold, ANSI.yellow)} ${skill.name}\n${skill.snippet}`
         );
@@ -1719,11 +1845,11 @@ class EthubCliAgent {
     this.print(style(`\n[READFILE] ${rel}`, ANSI.bold, ANSI.cyan));
     this.print(style(`bytes: ${Buffer.byteLength(text, 'utf8')} | shown: ${Buffer.byteLength(shown, 'utf8')}`, ANSI.dim));
     this.print(shown);
-    this.logger.writeEvent('read_file', {
-      action_id: action.id,
-      file: filePath,
-      bytes: Buffer.byteLength(text, 'utf8'),
-      shown_bytes: Buffer.byteLength(shown, 'utf8')
+    this.loopState = 'idle';
+    this.updateTask('io', {
+      label: 'helpers/filesystem',
+      state: 'done',
+      detail: `read ${rel}`
     });
   }
 
@@ -1743,10 +1869,11 @@ class EthubCliAgent {
     }
     this.print(style(`[I/O WRITE] ${action.payload.rel}`, ANSI.bold, ANSI.cyan));
     this.print(style(`[WRITEFILE] wrote ${content.length} chars to ${action.payload.rel}`, ANSI.bold, ANSI.cyan));
-    this.logger.writeEvent('write_file', {
-      action_id: action.id,
-      file: filePath,
-      chars: content.length
+    this.loopState = 'idle';
+    this.updateTask('io', {
+      label: 'helpers/filesystem',
+      state: 'done',
+      detail: `wrote ${action.payload.rel}`
     });
   }
 
@@ -1775,16 +1902,30 @@ class EthubCliAgent {
     this.skills.push(skill);
     this.saveSkills();
     this.print(style(`[SKILL ADDED] ${skill.name} (${skill.id}) executable=${skill.executable ? 'yes' : 'no'}`, ANSI.bold, ANSI.cyan));
-    this.logger.writeEvent('skill_added', {
-      action_id: action.id,
-      skill_id: skill.id,
-      skill_name: skill.name,
-      executable: skill.executable
+    this.loopState = 'idle';
+    this.updateTask('io', {
+      label: 'helpers/filesystem',
+      state: 'done',
+      detail: `skill added ${skill.name}`
     });
   }
 
   async handleUserPrompt(input) {
     const reasoning = this.determineIntentWithHopper(input);
+    this.activeLane = reasoning.hopper_lane || 'general';
+    this.activePrompt = input;
+    this.loopState = 'planning';
+    this.promptTokensEst = estimateTokens(input);
+    this.updateTask('plan', {
+      label: `architect/${this.activeLane}`,
+      state: 'active',
+      detail: `intent=${reasoning.intent}`
+    });
+    this.updateTask('worker', {
+      label: 'worker/ollama',
+      state: 'pending',
+      detail: 'payload staged'
+    });
     const action = {
       id: `act_${Date.now()}`,
       type: 'ollama_chat',
@@ -1793,76 +1934,33 @@ class EthubCliAgent {
       created_at: nowIso()
     };
 
-    this.logger.writeTranscript('User', input);
-    this.logger.writeEvent('user_prompt', {
-      text: input,
-      hopper_lane: reasoning.hopper_lane,
-      reasoning_summary: reasoning,
-      proposed_action: { id: action.id, type: action.type }
-    });
     this.actionMeta[action.id] = {
       prompt: input,
       prompt_chars_before: input.length
     };
     await this.showReasoningFlow(reasoning, input);
 
-    this.logger.writeStructuredRecord({
-      timestamp: nowIso(),
-      query: input,
-      reasoning: {
-        query: reasoning.query,
-        intent: reasoning.intent,
-        keywords: reasoning.keywords,
-        search_strategy: reasoning.strategy
-      },
-      actions: {
-        action: 'local_ollama_request',
-        sources: ['ollama_localhost'],
-        Context: 'Analyzing locally via Ollama only; no OpenAI/Gemini/external model APIs.'
-      },
-      Commands: "ls, grep, nano, cd, nano 'create-new-file-diff-snippet-number+1.sh', regen entire file with changes then save, cp -rf old/path/to/file move/to/backup/path/file, rm old/path/to/file, bash create-new-file-(diff-snippet-line:character)-(number)+1, sed -i 's/old/new' \"$file\"",
-      Diff: '+,-',
-      Path: 'path/to/file:line:character',
-      action_id: action.id,
-      'Print-approved-by-user?': 'not_required (run commands)',
-      'Run runtime look at logs': 'pending',
-      summary: 'pending',
-      'Number of characters changed': 'pending'
-    });
-
     await this.executeAction(action);
-  }
-
-  writeStructuredUpdate(actionId, patch) {
-    this.logger.writeStructuredRecord({
-      timestamp: nowIso(),
-      action_id: actionId,
-      update: patch
-    });
   }
 
   async executeAction(action) {
     if (!action || action.type !== 'ollama_chat') {
-      this.logger.writeEvent('action_error', { message: 'Unsupported action type', action });
-      this.writeStructuredUpdate(action && action.id ? action.id : 'unknown', {
-        'Run runtime look at logs': 'contains error still, unsupported action type',
-        summary: 'Unsupported action type encountered before runtime request.',
-        'Number of characters changed': 'previous character amount in file before cmd/new total character count added: 0/0'
-      });
       this.print('Unsupported action.');
       return;
     }
 
-    this.logger.writeEvent('action_start', {
-      action_id: action.id,
-      type: action.type,
-      target: this.ollamaUrl,
-      model: this.model,
-      prompt_chars: action.prompt.length,
-      reasoning_summary: action.reasoning_summary
-    });
-
     this.history.push({ role: 'user', content: action.prompt });
+    this.loopState = 'running';
+    this.updateTask('plan', {
+      label: `architect/${this.activeLane}`,
+      state: 'done',
+      detail: 'request shaped'
+    });
+    this.updateTask('worker', {
+      label: 'worker/ollama',
+      state: 'active',
+      detail: 'waiting on local model'
+    });
 
     const payload = {
       model: this.model,
@@ -1886,16 +1984,11 @@ class EthubCliAgent {
     } catch (error) {
       this.stopThinking();
       const message = error && error.message ? error.message : String(error);
-      this.logger.writeEvent('action_failure', {
-        action_id: action.id,
-        duration_ms: Date.now() - started,
-        error: message
-      });
-      this.writeStructuredUpdate(action.id, {
-        'Run runtime look at logs': 'contains error still, loop and try again with different results until each individual error is clear.',
-        summary: `Runtime request failed. Error: ${message}`,
-        'Number of characters changed': `previous character amount in file before cmd/new total character count added: ${action.prompt.length}/0`,
-        'Print-approved-by-user?': 'true'
+      this.loopState = 'error';
+      this.updateTask('worker', {
+        label: 'worker/ollama',
+        state: 'error',
+        detail: truncateText(message, 48)
       });
       this.print(`Ollama request failed: ${message}`);
       return;
@@ -1914,36 +2007,23 @@ class EthubCliAgent {
       : raw;
 
     this.history.push({ role: 'assistant', content: assistantText });
-
-    this.logger.writeEvent('action_result', {
-      action_id: action.id,
-      duration_ms: Date.now() - started,
-      http_status: response.status,
-      ok: response.ok,
-      response_preview: assistantText.slice(0, 400),
-      response_chars: assistantText.length
-    });
-
-    this.logger.writeTranscript('Assistant', assistantText);
-    this.print(assistantText);
-
+    this.completionTokensEst = estimateTokens(assistantText);
+    this.lastLatencyMs = Date.now() - started;
+    this.actionsRun += 1;
+    this.totalCostEst = Number((((this.promptTokensEst + this.completionTokensEst) / 1000000) * 0.1).toFixed(4));
     const hasRuntimeError = /(syntaxerror|stack overflow|runtime error|error:)/i.test(assistantText);
-    const runtimeResult = hasRuntimeError
-      ? 'contains error still, retry with different checks until isolated'
-      : 'No runtime error anymore = fixed';
-    const beforeChars = this.actionMeta[action.id] && this.actionMeta[action.id].prompt_chars_before
-      ? this.actionMeta[action.id].prompt_chars_before
-      : 0;
-    const afterChars = assistantText.length;
-    const elapsedMs = Date.now() - started;
-
-    this.writeStructuredUpdate(action.id, {
-      'Run runtime look at logs': runtimeResult,
-      summary: `summarized what just changed, is it fixed: ${hasRuntimeError ? 'No' : 'Yes'}. Runtime error count estimate: ${hasRuntimeError ? 1 : 0}.`,
-      'Number of characters changed': `previous character amount in file before cmd/new total character count added: ${beforeChars}/${afterChars}`,
-      timing_ms: elapsedMs,
-      stop_condition: elapsedMs >= 300000 ? 'Unable to find results or solutions, Try again.' : 'within loop budget'
+    this.loopState = hasRuntimeError ? 'error' : 'idle';
+    this.updateTask('worker', {
+      label: 'worker/ollama',
+      state: hasRuntimeError ? 'error' : 'done',
+      detail: hasRuntimeError ? 'response flagged an error' : 'response committed'
     });
+    this.updateTask('plan', {
+      label: `architect/${this.activeLane}`,
+      state: hasRuntimeError ? 'error' : 'done',
+      detail: hasRuntimeError ? 'follow-up needed' : 'loop complete'
+    });
+    this.print(assistantText);
   }
 }
 
