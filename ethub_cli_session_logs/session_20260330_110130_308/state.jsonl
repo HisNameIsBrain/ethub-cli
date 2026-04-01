@@ -1,6 +1,0 @@
-{"ts":"2026-03-30T11:01:30.313Z","model":"qwen2.5:0.5b","ollama_url":"http://127.0.0.1:11434/api/chat","require_approval":false,"history_count":0,"pending_action":null}
-{"ts":"2026-03-30T11:01:33.276Z","model":"qwen2.5:0.5b","ollama_url":"http://127.0.0.1:11434/api/chat","require_approval":false,"history_count":0,"pending_action":null}
-{"ts":"2026-03-30T11:01:33.476Z","model":"qwen2.5:0.5b","ollama_url":"http://127.0.0.1:11434/api/chat","require_approval":false,"history_count":0,"pending_action":{"id":"act_1774868493475","type":"read_file","payload":{"path":"/root/ethub-cli/src/cli/ethub_cli.js","rel":"src/cli/ethub_cli.js"},"created_at":"2026-03-30T11:01:33.475Z"}}
-{"ts":"2026-03-30T11:01:33.679Z","model":"qwen2.5:0.5b","ollama_url":"http://127.0.0.1:11434/api/chat","require_approval":false,"history_count":0,"pending_action":null}
-{"ts":"2026-03-30T11:01:33.879Z","model":"qwen2.5:0.5b","ollama_url":"http://127.0.0.1:11434/api/chat","require_approval":false,"history_count":0,"pending_action":{"id":"act_1774868493879","type":"write_file","payload":{"path":"/root/ethub-cli/src/tmp_test.txt","rel":"src/tmp_test.txt","content":"hello from cli"},"created_at":"2026-03-30T11:01:33.879Z"}}
-{"ts":"2026-03-30T11:01:34.082Z","model":"qwen2.5:0.5b","ollama_url":"http://127.0.0.1:11434/api/chat","require_approval":false,"history_count":0,"pending_action":null}
