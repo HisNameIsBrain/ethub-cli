@@ -566,6 +566,26 @@ const server = http.createServer(async (req, res) => {
     });
   }
 
+  if (u.pathname === '/api/ethub-io') {
+    const session = resolveSessionName('ethub');
+    if (!session) {
+      return sendJson(res, 200, { ok: true, session: '', events: [] });
+    }
+    const sessionDir = safeJoin(SOURCES.ethub, session);
+    const eventsPath = sessionDir ? path.join(sessionDir, 'events.jsonl') : '';
+    const events = readJsonlTail(eventsPath, 3000);
+    const ioTypes = new Set(['stdin', 'stdout', 'read_file', 'write_file', 'action_start', 'action_result', 'action_failure']);
+    const rows = events
+      .filter((evt) => evt && ioTypes.has(evt.type))
+      .slice(-80)
+      .map((evt) => ({
+        ts: evt.ts || null,
+        type: evt.type,
+        payload: evt.payload || {}
+      }));
+    return sendJson(res, 200, { ok: true, session, events: rows });
+  }
+
   if (u.pathname === '/api/list') {
     const source = u.searchParams.get('source') || '';
     const base = SOURCES[source];

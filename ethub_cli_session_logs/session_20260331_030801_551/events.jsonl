@@ -1,0 +1,19 @@
+{"index":1,"ts":"2026-03-31T03:08:01.553Z","type":"session_start","payload":{"app":"ethub-cli-agent","started_at":"2026-03-31T03:08:01.553Z","session_dir":"/root/ethub-cli/ethub_cli_session_logs/session_20260331_030801_551","cwd":"/root/ethub-cli","node":"v24.14.0","platform":"linux 6.8.0-106-generic","ollama_url":"http://127.0.0.1:11434/api/chat","model_default":"qwen2.5:0.5b"}}
+{"index":2,"ts":"2026-03-31T03:08:01.557Z","type":"config","payload":{"require_approval":false,"model":"qwen2.5:0.5b","ollama_url":"http://127.0.0.1:11434/api/chat","commands":["/help","/status","/model <name>","/approve changes on|off","/readfile <path>","/writefile <path> -- <content>","/cd <path>","/yes","/no","/exit"]}}
+{"index":3,"ts":"2026-03-31T03:08:01.558Z","type":"stdout","payload":{"text":"  -=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~-"}}
+{"index":4,"ts":"2026-03-31T03:08:01.559Z","type":"stdout","payload":{"text":"  +ooooooooooo ooooooooooooo ooooo   ooooo ooooo     ooo oooooooooo."}}
+{"index":5,"ts":"2026-03-31T03:08:01.560Z","type":"stdout","payload":{"text":"  `888'     `8 8'   888   `8 `888'   `888' `888'     `8' `888'   `Y8b"}}
+{"index":6,"ts":"2026-03-31T03:08:01.560Z","type":"stdout","payload":{"text":"   888              888       888     888   888       8   888     888"}}
+{"index":7,"ts":"2026-03-31T03:08:01.560Z","type":"stdout","payload":{"text":"   888oooo8         888       888ooooo888   88+       8   888oooo888'"}}
+{"index":8,"ts":"2026-03-31T03:08:01.560Z","type":"stdout","payload":{"text":"   888              888       888     888   8+8       8   888    `88b"}}
+{"index":9,"ts":"2026-03-31T03:08:01.560Z","type":"stdout","payload":{"text":"   888       o      888       888     888   `88.    .8'   888    .88P"}}
+{"index":10,"ts":"2026-03-31T03:08:01.560Z","type":"stdout","payload":{"text":"  o888ooooood8     o888o     o888o   o888o    `YbodP'    o888bood8P'"}}
+{"index":11,"ts":"2026-03-31T03:08:01.561Z","type":"stdout","payload":{"text":"  Mode: CHAT | Model: qwen2.5:0.5b | Change Approval: OFF | cwd: ."}}
+{"index":12,"ts":"2026-03-31T03:08:01.561Z","type":"stdout","payload":{"text":"  -=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~-"}}
+{"index":13,"ts":"2026-03-31T03:08:01.561Z","type":"stdout","payload":{"text":"ETHUB CLI Agent started. Ollama only, no external dependencies."}}
+{"index":14,"ts":"2026-03-31T03:08:01.561Z","type":"stdout","payload":{"text":"Session logs: /root/ethub-cli/ethub_cli_session_logs/session_20260331_030801_551"}}
+{"index":15,"ts":"2026-03-31T03:08:01.561Z","type":"stdout","payload":{"text":"Type /help for commands."}}
+{"index":16,"ts":"2026-03-31T03:08:01.561Z","type":"stdout","payload":{"text":""}}
+{"index":17,"ts":"2026-03-31T03:08:01.561Z","type":"stdout","payload":{"text":"  Suggestions (you can just start typing):"}}
+{"index":18,"ts":"2026-03-31T03:08:03.147Z","type":"stdout","payload":{"text":""}}
+{"index":19,"ts":"2026-03-31T03:08:03.147Z","type":"stdout","payload":{"text":"  cwd: ."}}

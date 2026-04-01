@@ -1,0 +1,8 @@
+{"ts":"2026-03-31T15:03:40.676Z","model":"qwen2.5:0.5b","ollama_url":"http://127.0.0.1:11434/api/chat","require_approval":false,"history_count":0,"pending_action":null}
+{"ts":"2026-03-31T15:03:48.364Z","model":"qwen2.5:0.5b","ollama_url":"http://127.0.0.1:11434/api/chat","require_approval":false,"history_count":2,"pending_action":null}
+{"ts":"2026-03-31T15:03:54.843Z","model":"qwen2.5:0.5b","ollama_url":"http://127.0.0.1:11434/api/chat","require_approval":false,"history_count":4,"pending_action":null}
+{"ts":"2026-03-31T15:04:33.479Z","model":"qwen2.5:0.5b","ollama_url":"http://127.0.0.1:11434/api/chat","require_approval":false,"history_count":6,"pending_action":null}
+{"ts":"2026-03-31T15:04:53.950Z","model":"qwen2.5:0.5b","ollama_url":"http://127.0.0.1:11434/api/chat","require_approval":false,"history_count":6,"pending_action":null}
+{"ts":"2026-03-31T15:04:56.401Z","model":"qwen2.5:0.5b","ollama_url":"http://127.0.0.1:11434/api/chat","require_approval":false,"history_count":6,"pending_action":null}
+{"ts":"2026-03-31T15:05:03.659Z","model":"qwen2.5:0.5b","ollama_url":"http://127.0.0.1:11434/api/chat","require_approval":true,"history_count":6,"pending_action":null}
+{"ts":"2026-03-31T15:05:13.506Z","model":"qwen2.5:0.5b","ollama_url":"http://127.0.0.1:11434/api/chat","require_approval":true,"history_count":8,"pending_action":null}

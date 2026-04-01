@@ -1,0 +1,555 @@
+# ETHUB CLI Change Log
+session_id: session_20260331_030803_281
+created_at: 2026-03-31T03:08:03.286Z
+source_file: /tmp/ethub_bench/commits/1d75f2f.js
+note: New file per session, append-only event/state logs enabled.
+
+## Source Snapshot (Line Numbered)
+0001: #!/usr/bin/env node
+0002: 
+0003: const fs = require('fs');
+0004: const path = require('path');
+0005: const os = require('os');
+0006: const readline = require('readline');
+0007: 
+0008: const APP_NAME = 'ethub-cli-agent';
+0009: const DEFAULT_OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434/api/chat';
+0010: const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'llama3.1';
+0011: const LOG_ROOT = path.join(process.cwd(), 'ethub_cli_session_logs');
+0012: const CHANGE_LOG_ROOT = path.join(process.cwd(), 'ethub_cli_change_logs');
+0013: const CODEX_LOG_ROOT = path.join(process.cwd(), 'codex_logs');
+0014: const CODEX_MAX_LINES_PER_FILE = 2000;
+0015: 
+0016: function nowIso() {
+0017:   return new Date().toISOString();
+0018: }
+0019: 
+0020: function ensureDir(dirPath) {
+0021:   fs.mkdirSync(dirPath, { recursive: true });
+0022: }
+0023: 
+0024: function safeJson(value) {
+0025:   try {
+0026:     return JSON.stringify(value);
+0027:   } catch {
+0028:     return JSON.stringify({ unserializable: true, type: typeof value });
+0029:   }
+0030: }
+0031: 
+0032: function summarizeReasoning(input) {
+0033:   const raw = String(input || '').trim();
+0034:   const lowered = raw.toLowerCase();
+0035:   const keywords = raw
+0036:     .split(/\s+/)
+0037:     .map((w) => w.replace(/[^a-zA-Z0-9_-]/g, ''))
+0038:     .filter(Boolean)
+0039:     .slice(0, 12);
+0040: 
+0041:   let intent = 'general_request';
+0042:   if (/error|syntax|stack|trace|bug|fix|crash/.test(lowered)) intent = 'debugging';
+0043:   else if (/how|what|why|explain|guide|tutorial/.test(lowered)) intent = 'information_lookup';
+0044:   else if (/build|create|make|implement|write/.test(lowered)) intent = 'implementation';
+0045: 
+0046:   let strategy = 'Use local conversation context then query Ollama for a grounded response.';
+0047:   if (intent === 'debugging') {
+0048:     strategy = 'Focus on likely fault points, propose checks, and request missing runtime details if needed.';
+0049:   }
+0050: 
+0051:   return {
+0052:     query: raw,
+0053:     intent,
+0054:     keywords,
+0055:     strategy,
+0056:     note: 'Detailed private chain-of-thought is not exposed; this is a concise decision summary.'
+0057:   };
+0058: }
+0059: 
+0060: class SessionLogger {
+0061:   constructor(rootDir) {
+0062:     ensureDir(rootDir);
+0063:     ensureDir(CHANGE_LOG_ROOT);
+0064:     ensureDir(CODEX_LOG_ROOT);
+0065:     this.rootDir = rootDir;
+0066:     this.sessionId = this.buildSessionId();
+0067:     this.sessionDir = path.join(this.rootDir, this.sessionId);
+0068:     ensureDir(this.sessionDir);
+0069: 
+0070:     this.eventsPath = path.join(this.sessionDir, 'events.jsonl');
+0071:     this.transcriptPath = path.join(this.sessionDir, 'transcript.md');
+0072:     this.statePath = path.join(this.sessionDir, 'state.jsonl');
+0073:     this.structuredPath = path.join(this.sessionDir, 'structured_history.jsonl');
+0074:     this.latestPath = path.join(this.rootDir, 'LATEST_SESSION.txt');
+0075:     this.changeLogPath = path.join(CHANGE_LOG_ROOT, `${this.sessionId}_changes.log`);
+0076:     this.codexMetaPath = path.join(CODEX_LOG_ROOT, `codex_${this.sessionId}.meta.json`);
+0077:     this.codexLineCount = 0;
+0078:     this.codexPart = 1;
+0079:     this.codexEventsPath = this.getCodexEventsPath(this.codexPart);
+0080: 
+0081:     this.counter = 0;
+0082:     fs.writeFileSync(this.latestPath, `${this.sessionId}\n`, 'utf8');
+0083:     fs.writeFileSync(
+0084:       this.transcriptPath,
+0085:       `# ETHUB CLI Session\n\n- session_id: ${this.sessionId}\n- started_at: ${nowIso()}\n- cwd: ${process.cwd()}\n- ollama_url: ${DEFAULT_OLLAMA_URL}\n- model_default: ${DEFAULT_MODEL}\n\n`,
+0086:       'utf8'
+0087:     );
+0088:     this.writeCodeSnapshot();
+0089:     fs.writeFileSync(
+0090:       this.codexMetaPath,
+0091:       `${safeJson({
+0092:         app: APP_NAME,
+0093:         session_id: this.sessionId,
+0094:         created_at: nowIso(),
+0095:         cwd: process.cwd(),
+0096:         source: path.resolve(__filename),
+0097:         codex_max_lines_per_file: CODEX_MAX_LINES_PER_FILE,
+0098:         codex_current_part: this.codexPart,
+0099:         codex_current_file: path.basename(this.codexEventsPath)
+0100:       })}\n`,
+0101:       'utf8'
+0102:     );
+0103: 
+0104:     this.writeEvent('session_start', {
+0105:       app: APP_NAME,
+0106:       started_at: nowIso(),
+0107:       session_dir: this.sessionDir,
+0108:       cwd: process.cwd(),
+0109:       node: process.version,
+0110:       platform: `${os.platform()} ${os.release()}`,
+0111:       ollama_url: DEFAULT_OLLAMA_URL,
+0112:       model_default: DEFAULT_MODEL
+0113:     });
+0114:   }
+0115: 
+0116:   buildSessionId() {
+0117:     const d = new Date();
+0118:     const stamp = [
+0119:       d.getUTCFullYear(),
+0120:       String(d.getUTCMonth() + 1).padStart(2, '0'),
+0121:       String(d.getUTCDate()).padStart(2, '0'),
+0122:       '_',
+0123:       String(d.getUTCHours()).padStart(2, '0'),
+0124:       String(d.getUTCMinutes()).padStart(2, '0'),
+0125:       String(d.getUTCSeconds()).padStart(2, '0'),
+0126:       '_',
+0127:       String(d.getUTCMilliseconds()).padStart(3, '0')
+0128:     ].join('');
+0129:     return `session_${stamp}`;
+0130:   }
+0131: 
+0132:   writeEvent(type, payload) {
+0133:     this.counter += 1;
+0134:     const event = {
+0135:       index: this.counter,
+0136:       ts: nowIso(),
+0137:       type,
+0138:       payload
+0139:     };
+0140:     fs.appendFileSync(this.eventsPath, `${safeJson(event)}\n`, 'utf8');
+0141:     this.writeCodexEvent({ session_id: this.sessionId, ...event });
+0142:   }
+0143: 
+0144:   getCodexEventsPath(part) {
+0145:     const suffix = part === 1 ? '' : `_part${String(part).padStart(3, '0')}`;
+0146:     return path.join(CODEX_LOG_ROOT, `codex_${this.sessionId}${suffix}.jsonl`);
+0147:   }
+0148: 
+0149:   rotateCodexLog() {
+0150:     this.codexPart += 1;
+0151:     this.codexLineCount = 0;
+0152:     this.codexEventsPath = this.getCodexEventsPath(this.codexPart);
+0153:     fs.appendFileSync(
+0154:       this.codexMetaPath,
+0155:       `${safeJson({
+0156:         ts: nowIso(),
+0157:         event: 'codex_log_rotate',
+0158:         codex_current_part: this.codexPart,
+0159:         codex_current_file: path.basename(this.codexEventsPath)
+0160:       })}\n`,
+0161:       'utf8'
+0162:     );
+0163:   }
+0164: 
+0165:   writeCodexEvent(event) {
+0166:     if (this.codexLineCount >= CODEX_MAX_LINES_PER_FILE) {
+0167:       this.rotateCodexLog();
+0168:     }
+0169:     fs.appendFileSync(this.codexEventsPath, `${safeJson(event)}\n`, 'utf8');
+0170:     this.codexLineCount += 1;
+0171:   }
+0172: 
+0173:   writeTranscript(role, content) {
+0174:     const text = String(content || '').trimEnd();
+0175:     const block = `\n## ${role} @ ${nowIso()}\n\n${text}\n`;
+0176:     fs.appendFileSync(this.transcriptPath, block, 'utf8');
+0177:   }
+0178: 
+0179:   writeState(state) {
+0180:     fs.appendFileSync(this.statePath, `${safeJson(state)}\n`, 'utf8');
+0181:   }
+0182: 
+0183:   writeStructuredRecord(record) {
+0184:     fs.appendFileSync(this.structuredPath, `${safeJson(record)}\n`, 'utf8');
+0185:   }
+0186: 
+0187:   writeCodeSnapshot() {
+0188:     const sourcePath = path.resolve(__filename);
+0189:     let sourceText = '';
+0190:     try {
+0191:       sourceText = fs.readFileSync(sourcePath, 'utf8');
+0192:     } catch (error) {
+0193:       sourceText = `Unable to read source file: ${error && error.message ? error.message : String(error)}`;
+0194:     }
+0195: 
+0196:     const numbered = sourceText
+0197:       .split('\n')
+0198:       .map((line, i) => `${String(i + 1).padStart(4, '0')}: ${line}`)
+0199:       .join('\n');
+0200: 
+0201:     const header =
+0202:       `# ETHUB CLI Change Log\n` +
+0203:       `session_id: ${this.sessionId}\n` +
+0204:       `created_at: ${nowIso()}\n` +
+0205:       `source_file: ${sourcePath}\n` +
+0206:       `note: New file per session, append-only event/state logs enabled.\n\n` +
+0207:       `## Source Snapshot (Line Numbered)\n`;
+0208: 
+0209:     fs.writeFileSync(this.changeLogPath, `${header}${numbered}\n`, 'utf8');
+0210:   }
+0211: }
+0212: 
+0213: class EthubCliAgent {
+0214:   constructor() {
+0215:     this.logger = new SessionLogger(LOG_ROOT);
+0216:     this.model = DEFAULT_MODEL;
+0217:     this.ollamaUrl = DEFAULT_OLLAMA_URL;
+0218:     this.requireApproval = true;
+0219:     this.history = [];
+0220:     this.pendingAction = null;
+0221:     this.actionMeta = {};
+0222: 
+0223:     this.rl = readline.createInterface({
+0224:       input: process.stdin,
+0225:       output: process.stdout,
+0226:       prompt: 'ethub> '
+0227:     });
+0228: 
+0229:     this.logger.writeEvent('config', {
+0230:       require_approval: this.requireApproval,
+0231:       model: this.model,
+0232:       ollama_url: this.ollamaUrl,
+0233:       commands: ['/help', '/status', '/model <name>', '/approve on', '/yes', '/no', '/exit']
+0234:     });
+0235: 
+0236:     this.flushState();
+0237:   }
+0238: 
+0239:   flushState() {
+0240:     this.logger.writeState({
+0241:       ts: nowIso(),
+0242:       model: this.model,
+0243:       ollama_url: this.ollamaUrl,
+0244:       require_approval: this.requireApproval,
+0245:       history_count: this.history.length,
+0246:       pending_action: this.pendingAction
+0247:     });
+0248:   }
+0249: 
+0250:   start() {
+0251:     this.print('ETHUB CLI Agent started. Ollama only, no external dependencies.');
+0252:     this.print(`Session logs: ${this.logger.sessionDir}`);
+0253:     this.print('Type /help for commands.');
+0254:     this.rl.prompt();
+0255: 
+0256:     this.rl.on('line', async (line) => {
+0257:       const input = String(line || '').trim();
+0258:       this.logger.writeEvent('stdin', { raw: line, trimmed: input });
+0259: 
+0260:       if (!input) {
+0261:         this.rl.prompt();
+0262:         return;
+0263:       }
+0264: 
+0265:       try {
+0266:         if (input.startsWith('/')) {
+0267:           await this.handleCommand(input);
+0268:         } else {
+0269:           await this.handleUserPrompt(input);
+0270:         }
+0271:       } catch (error) {
+0272:         const message = error && error.message ? error.message : String(error);
+0273:         this.print(`Error: ${message}`);
+0274:         this.logger.writeEvent('runtime_error', { message, stack: error && error.stack ? error.stack : null });
+0275:       }
+0276: 
+0277:       this.flushState();
+0278:       this.rl.prompt();
+0279:     });
+0280: 
+0281:     this.rl.on('close', () => {
+0282:       this.logger.writeEvent('session_end', { ended_at: nowIso() });
+0283:       process.stdout.write('\nSession closed.\n');
+0284:       process.exit(0);
+0285:     });
+0286:   }
+0287: 
+0288:   print(text) {
+0289:     process.stdout.write(`${text}\n`);
+0290:     this.logger.writeEvent('stdout', { text });
+0291:   }
+0292: 
+0293:   async handleCommand(input) {
+0294:     const [cmd, ...args] = input.split(/\s+/);
+0295:     const command = cmd.toLowerCase();
+0296:     this.logger.writeEvent('subcommand', { command, args });
+0297: 
+0298:     if (command === '/help') {
+0299:       this.print('Commands: /help, /status, /model <name>, /approve on, /yes, /no, /exit');
+0300:       return;
+0301:     }
+0302: 
+0303:     if (command === '/status') {
+0304:       this.print(safeJson({
+0305:         model: this.model,
+0306:         ollama_url: this.ollamaUrl,
+0307:         require_approval: this.requireApproval,
+0308:         history_count: this.history.length,
+0309:         pending_action: this.pendingAction ? this.pendingAction.id : null
+0310:       }));
+0311:       return;
+0312:     }
+0313: 
+0314:     if (command === '/model') {
+0315:       const nextModel = args.join(' ').trim();
+0316:       if (!nextModel) {
+0317:         this.print(`Current model: ${this.model}`);
+0318:         return;
+0319:       }
+0320:       this.model = nextModel;
+0321:       this.print(`Model updated: ${this.model}`);
+0322:       this.logger.writeEvent('config_update', { key: 'model', value: this.model });
+0323:       return;
+0324:     }
+0325: 
+0326:     if (command === '/approve') {
+0327:       const mode = (args[0] || '').toLowerCase();
+0328:       if (mode !== 'on') {
+0329:         this.print('Approval is mandatory. Use: /approve on');
+0330:         return;
+0331:       }
+0332:       this.requireApproval = true;
+0333:       this.print('Approval mode: on');
+0334:       this.logger.writeEvent('config_update', { key: 'require_approval', value: this.requireApproval });
+0335:       return;
+0336:     }
+0337: 
+0338:     if (command === '/yes') {
+0339:       if (!this.pendingAction) {
+0340:         this.print('No pending action to approve.');
+0341:         return;
+0342:       }
+0343:       const action = this.pendingAction;
+0344:       this.pendingAction = null;
+0345:       this.logger.writeEvent('approval', { action_id: action.id, approved: true });
+0346:       this.writeStructuredUpdate(action.id, {
+0347:         'Print-approved-by-user?': 'true',
+0348:         approved: true
+0349:       });
+0350:       await this.executeAction(action);
+0351:       return;
+0352:     }
+0353: 
+0354:     if (command === '/no') {
+0355:       if (!this.pendingAction) {
+0356:         this.print('No pending action to reject.');
+0357:         return;
+0358:       }
+0359:       const action = this.pendingAction;
+0360:       this.pendingAction = null;
+0361:       this.logger.writeEvent('approval', { action_id: action.id, approved: false });
+0362:       this.writeStructuredUpdate(action.id, {
+0363:         'Print-approved-by-user?': 'false',
+0364:         approved: false,
+0365:         summary: 'Action was rejected by user before runtime execution.',
+0366:         'Run runtime look at logs': 'skipped (approval rejected)'
+0367:       });
+0368:       this.print(`Action ${action.id} skipped.`);
+0369:       return;
+0370:     }
+0371: 
+0372:     if (command === '/exit') {
+0373:       this.rl.close();
+0374:       return;
+0375:     }
+0376: 
+0377:     this.print(`Unknown command: ${command}. Use /help.`);
+0378:   }
+0379: 
+0380:   async handleUserPrompt(input) {
+0381:     const reasoning = summarizeReasoning(input);
+0382:     const action = {
+0383:       id: `act_${Date.now()}`,
+0384:       type: 'ollama_chat',
+0385:       prompt: input,
+0386:       reasoning_summary: reasoning,
+0387:       created_at: nowIso()
+0388:     };
+0389: 
+0390:     this.logger.writeTranscript('User', input);
+0391:     this.logger.writeEvent('user_prompt', {
+0392:       text: input,
+0393:       reasoning_summary: reasoning,
+0394:       proposed_action: { id: action.id, type: action.type }
+0395:     });
+0396:     this.actionMeta[action.id] = {
+0397:       prompt: input,
+0398:       prompt_chars_before: input.length
+0399:     };
+0400: 
+0401:     this.logger.writeStructuredRecord({
+0402:       timestamp: nowIso(),
+0403:       query: input,
+0404:       reasoning: {
+0405:         query: reasoning.query,
+0406:         intent: reasoning.intent,
+0407:         keywords: reasoning.keywords,
+0408:         search_strategy: reasoning.strategy
+0409:       },
+0410:       actions: {
+0411:         action: 'local_ollama_request',
+0412:         sources: ['ollama_localhost'],
+0413:         Context: 'Analyzing locally via Ollama only; no OpenAI/Gemini/external model APIs.'
+0414:       },
+0415:       Commands: "ls, grep, nano, cd, nano 'create-new-file-diff-snippet-number+1.sh', regen entire file with changes then save, cp -rf old/path/to/file move/to/backup/path/file, rm old/path/to/file, bash create-new-file-(diff-snippet-line:character)-(number)+1, sed -i 's/old/new' \"$file\"",
+0416:       Diff: '+,-',
+0417:       Path: 'path/to/file:line:character',
+0418:       action_id: action.id,
+0419:       'Print-approved-by-user?': this.requireApproval ? 'pending' : 'true',
+0420:       'Run runtime look at logs': 'pending',
+0421:       summary: 'pending',
+0422:       'Number of characters changed': 'pending'
+0423:     });
+0424: 
+0425:     if (this.requireApproval) {
+0426:       this.pendingAction = action;
+0427:       this.print(`Pending action ${action.id}: send prompt to Ollama model '${this.model}'.`);
+0428:       this.print('Approve with /yes or reject with /no.');
+0429:       return;
+0430:     }
+0431: 
+0432:     await this.executeAction(action);
+0433:   }
+0434: 
+0435:   writeStructuredUpdate(actionId, patch) {
+0436:     this.logger.writeStructuredRecord({
+0437:       timestamp: nowIso(),
+0438:       action_id: actionId,
+0439:       update: patch
+0440:     });
+0441:   }
+0442: 
+0443:   async executeAction(action) {
+0444:     if (!action || action.type !== 'ollama_chat') {
+0445:       this.logger.writeEvent('action_error', { message: 'Unsupported action type', action });
+0446:       this.writeStructuredUpdate(action && action.id ? action.id : 'unknown', {
+0447:         'Run runtime look at logs': 'contains error still, unsupported action type',
+0448:         summary: 'Unsupported action type encountered before runtime request.',
+0449:         'Number of characters changed': 'previous character amount in file before cmd/new total character count added: 0/0'
+0450:       });
+0451:       this.print('Unsupported action.');
+0452:       return;
+0453:     }
+0454: 
+0455:     this.logger.writeEvent('action_start', {
+0456:       action_id: action.id,
+0457:       type: action.type,
+0458:       target: this.ollamaUrl,
+0459:       model: this.model,
+0460:       prompt_chars: action.prompt.length,
+0461:       reasoning_summary: action.reasoning_summary
+0462:     });
+0463: 
+0464:     this.history.push({ role: 'user', content: action.prompt });
+0465: 
+0466:     const payload = {
+0467:       model: this.model,
+0468:       messages: this.history,
+0469:       stream: false
+0470:     };
+0471: 
+0472:     let response;
+0473:     let raw;
+0474:     const started = Date.now();
+0475: 
+0476:     try {
+0477:       response = await fetch(this.ollamaUrl, {
+0478:         method: 'POST',
+0479:         headers: { 'Content-Type': 'application/json' },
+0480:         body: JSON.stringify(payload)
+0481:       });
+0482: 
+0483:       raw = await response.text();
+0484:     } catch (error) {
+0485:       const message = error && error.message ? error.message : String(error);
+0486:       this.logger.writeEvent('action_failure', {
+0487:         action_id: action.id,
+0488:         duration_ms: Date.now() - started,
+0489:         error: message
+0490:       });
+0491:       this.writeStructuredUpdate(action.id, {
+0492:         'Run runtime look at logs': 'contains error still, loop and try again with different results until each individual error is clear.',
+0493:         summary: `Runtime request failed. Error: ${message}`,
+0494:         'Number of characters changed': `previous character amount in file before cmd/new total character count added: ${action.prompt.length}/0`,
+0495:         'Print-approved-by-user?': 'true'
+0496:       });
+0497:       this.print(`Ollama request failed: ${message}`);
+0498:       return;
+0499:     }
+0500: 
+0501:     let parsed;
+0502:     try {
+0503:       parsed = JSON.parse(raw);
+0504:     } catch {
+0505:       parsed = null;
+0506:     }
+0507: 
+0508:     const assistantText = parsed && parsed.message && parsed.message.content
+0509:       ? String(parsed.message.content)
+0510:       : raw;
+0511: 
+0512:     this.history.push({ role: 'assistant', content: assistantText });
+0513: 
+0514:     this.logger.writeEvent('action_result', {
+0515:       action_id: action.id,
+0516:       duration_ms: Date.now() - started,
+0517:       http_status: response.status,
+0518:       ok: response.ok,
+0519:       response_preview: assistantText.slice(0, 400),
+0520:       response_chars: assistantText.length
+0521:     });
+0522: 
+0523:     this.logger.writeTranscript('Assistant', assistantText);
+0524:     this.print(assistantText);
+0525: 
+0526:     const hasRuntimeError = /(syntaxerror|stack overflow|runtime error|error:)/i.test(assistantText);
+0527:     const runtimeResult = hasRuntimeError
+0528:       ? 'contains error still, retry with different checks until isolated'
+0529:       : 'No runtime error anymore = fixed';
+0530:     const beforeChars = this.actionMeta[action.id] && this.actionMeta[action.id].prompt_chars_before
+0531:       ? this.actionMeta[action.id].prompt_chars_before
+0532:       : 0;
+0533:     const afterChars = assistantText.length;
+0534:     const elapsedMs = Date.now() - started;
+0535: 
+0536:     this.writeStructuredUpdate(action.id, {
+0537:       'Run runtime look at logs': runtimeResult,
+0538:       summary: `summarized what just changed, is it fixed: ${hasRuntimeError ? 'No' : 'Yes'}. Runtime error count estimate: ${hasRuntimeError ? 1 : 0}.`,
+0539:       'Number of characters changed': `previous character amount in file before cmd/new total character count added: ${beforeChars}/${afterChars}`,
+0540:       timing_ms: elapsedMs,
+0541:       stop_condition: elapsedMs >= 300000 ? 'Unable to find results or solutions, Try again.' : 'within loop budget'
+0542:     });
+0543:   }
+0544: }
+0545: 
+0546: const agent = new EthubCliAgent();
+0547: agent.start();
+0548: 

@@ -1,0 +1,32 @@
+{"index":1,"ts":"2026-03-31T15:18:24.942Z","type":"session_start","payload":{"app":"ethub-cli-agent","started_at":"2026-03-31T15:18:24.942Z","session_dir":"/root/ethub-cli/src/cli/ethub_cli_session_logs/session_20260331_151824_938","cwd":"/root/ethub-cli/src/cli","node":"v24.14.0","platform":"linux 6.8.0-106-generic","ollama_url":"http://127.0.0.1:11434/api/chat","model_default":"qwen2.5:0.5b"}}
+{"index":2,"ts":"2026-03-31T15:18:24.944Z","type":"config","payload":{"require_approval":false,"model":"qwen2.5:0.5b","ollama_url":"http://127.0.0.1:11434/api/chat","commands":["/help","/status","/model <name>","/approve changes on|off","/debug","/dashboard","/readfile <path>","/writefile <path> -- <content>","/cd <path>","/skills ...","/yes","/no","/exit"]}}
+{"index":3,"ts":"2026-03-31T15:18:24.946Z","type":"stdout","payload":{"text":"  -=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~-"}}
+{"index":4,"ts":"2026-03-31T15:18:24.947Z","type":"stdout","payload":{"text":"  +ooooooooooo ooooooooooooo ooooo   ooooo ooooo     ooo oooooooooo."}}
+{"index":5,"ts":"2026-03-31T15:18:24.947Z","type":"stdout","payload":{"text":"  `888'     `8 8'   888   `8 `888'   `888' `888'     `8' `888'   `Y8b"}}
+{"index":6,"ts":"2026-03-31T15:18:24.947Z","type":"stdout","payload":{"text":"   888              888       888     888   888       8   888     888"}}
+{"index":7,"ts":"2026-03-31T15:18:24.947Z","type":"stdout","payload":{"text":"   888oooo8         888       888ooooo888   88+       8   888oooo888'"}}
+{"index":8,"ts":"2026-03-31T15:18:24.947Z","type":"stdout","payload":{"text":"   888              888       888     888   8+8       8   888    `88b"}}
+{"index":9,"ts":"2026-03-31T15:18:24.947Z","type":"stdout","payload":{"text":"   888       o      888       888     888   `88.    .8'   888    .88P"}}
+{"index":10,"ts":"2026-03-31T15:18:24.947Z","type":"stdout","payload":{"text":"  o888ooooood8     o888o     o888o   o888o    `YbodP'    o888bood8P'"}}
+{"index":11,"ts":"2026-03-31T15:18:24.948Z","type":"stdout","payload":{"text":"  Mode: CHAT | Model: qwen2.5:0.5b | Change Approval: OFF | cwd: ."}}
+{"index":12,"ts":"2026-03-31T15:18:24.949Z","type":"stdout","payload":{"text":"  -=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~--=~-"}}
+{"index":13,"ts":"2026-03-31T15:18:24.949Z","type":"stdout","payload":{"text":"ETHUB CLI Agent started. Ollama only, no external dependencies."}}
+{"index":14,"ts":"2026-03-31T15:18:24.949Z","type":"stdout","payload":{"text":"Session logs: /root/ethub-cli/src/cli/ethub_cli_session_logs/session_20260331_151824_938"}}
+{"index":15,"ts":"2026-03-31T15:18:24.949Z","type":"stdout","payload":{"text":"Use /debug to launch the session-bound dashboard + chat."}}
+{"index":16,"ts":"2026-03-31T15:18:24.949Z","type":"stdout","payload":{"text":"Type /help for commands."}}
+{"index":17,"ts":"2026-03-31T15:18:24.949Z","type":"stdout","payload":{"text":""}}
+{"index":18,"ts":"2026-03-31T15:18:24.949Z","type":"stdout","payload":{"text":"  Suggestions (you can just start typing):"}}
+{"index":19,"ts":"2026-03-31T15:18:26.526Z","type":"stdout","payload":{"text":""}}
+{"index":20,"ts":"2026-03-31T15:18:26.527Z","type":"stdout","payload":{"text":"  cwd: ."}}
+{"index":21,"ts":"2026-03-31T15:18:26.899Z","type":"stdin","payload":{"raw":"/debug","trimmed":"/debug"}}
+{"index":22,"ts":"2026-03-31T15:18:26.899Z","type":"subcommand","payload":{"command":"/debug","args":[]}}
+{"index":23,"ts":"2026-03-31T15:18:26.900Z","type":"debug_dashboard_stop","payload":{"reason":"restart_debug_dashboard"}}
+{"index":24,"ts":"2026-03-31T15:18:26.904Z","type":"debug_dashboard_start","payload":{"path":"/root/ethub-cli/src/cli/web_debug/index_server.mjs","pid":13,"requested_port":3000,"token_length":256}}
+{"index":25,"ts":"2026-03-31T15:18:27.003Z","type":"debug_dashboard_exit","payload":{"code":1,"signal":null,"stderr":""}}
+{"index":26,"ts":"2026-03-31T15:18:27.024Z","type":"stdout","payload":{"text":"Error: debug dashboard did not report readiness in time."}}
+{"index":27,"ts":"2026-03-31T15:18:27.025Z","type":"runtime_error","payload":{"message":"debug dashboard did not report readiness in time.","stack":"Error: debug dashboard did not report readiness in time.\n    at EthubCliAgent.startDebugDashboard (/root/ethub-cli/src/cli/ethub_cli.js:979:11)\n    at async EthubCliAgent.handleCommand (/root/ethub-cli/src/cli/ethub_cli.js:1268:20)\n    at async Interface.<anonymous> (/root/ethub-cli/src/cli/ethub_cli.js:1006:11)"}}
+{"index":28,"ts":"2026-03-31T15:18:27.025Z","type":"stdout","payload":{"text":"  cwd: ."}}
+{"index":29,"ts":"2026-03-31T15:18:28.900Z","type":"stdin","payload":{"raw":"/exit","trimmed":"/exit"}}
+{"index":30,"ts":"2026-03-31T15:18:28.900Z","type":"subcommand","payload":{"command":"/exit","args":[]}}
+{"index":31,"ts":"2026-03-31T15:18:28.901Z","type":"debug_dashboard_stop","payload":{"reason":"cli_session_closed"}}
+{"index":32,"ts":"2026-03-31T15:18:28.901Z","type":"session_end","payload":{"ended_at":"2026-03-31T15:18:28.901Z"}}
